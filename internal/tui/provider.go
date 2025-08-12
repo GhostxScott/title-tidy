@@ -1,0 +1,164 @@
+package tui
+
+import (
+	"fmt"
+	"github.com/Digital-Shane/title-tidy/internal/core"
+	"github.com/Digital-Shane/title-tidy/internal/media"
+
+	"github.com/Digital-Shane/treeview"
+	"github.com/charmbracelet/lipgloss"
+)
+
+// Color scheme used throughout the rename visualization TUI.
+var (
+	// Core colors (5 colors)
+	colorPrimary    = lipgloss.Color("#3a6b4a") // Dark green - main text, headers
+	colorSecondary  = lipgloss.Color("#5a8c6a") // Medium green - shows, status bars
+	colorAccent     = lipgloss.Color("#8fc279") // Light green - borders, highlights
+	colorBackground = lipgloss.Color("#f8f8f8") // Light background
+	colorMuted      = lipgloss.Color("#9ba8c0") // Gray - episodes, secondary text
+
+	// State colors (2 colors)
+	colorSuccess = lipgloss.Color("#5dc796") // Success operations
+	colorError   = lipgloss.Color("#f04c56") // Error states
+)
+
+// ---- predicate helpers ----
+// metaRule adapts a metadata predicate to a node predicate. If a node lacks
+// metadata the predicate returns false.
+func metaRule(cond func(*core.MediaMeta) bool) func(*treeview.Node[treeview.FileInfo]) bool {
+	return func(n *treeview.Node[treeview.FileInfo]) bool {
+		if mm := core.GetMeta(n); mm != nil {
+			return cond(mm)
+		}
+		return false
+	}
+}
+
+// statusIs returns a predicate matching nodes whose rename status equals s
+func statusIs(s core.RenameStatus) func(*treeview.Node[treeview.FileInfo]) bool {
+	return metaRule(func(mm *core.MediaMeta) bool { return mm.RenameStatus == s })
+}
+
+// typeIs returns a predicate matching nodes of media type t
+func typeIs(t core.MediaType) func(*treeview.Node[treeview.FileInfo]) bool {
+	return metaRule(func(mm *core.MediaMeta) bool { return mm.Type == t })
+}
+
+// statusNoneType matches nodes with no status yet and a specific media type
+func statusNoneType(t core.MediaType) func(*treeview.Node[treeview.FileInfo]) bool {
+	return metaRule(func(mm *core.MediaMeta) bool { return mm.RenameStatus == core.RenameStatusNone && mm.Type == t })
+}
+
+// needsDir matches virtual nodes that require a directory to be created
+func needsDir() func(*treeview.Node[treeview.FileInfo]) bool {
+	return metaRule(func(mm *core.MediaMeta) bool { return mm.RenameStatus == core.RenameStatusNone && mm.NeedsDirectory })
+}
+
+// CreateRenameProvider constructs the [treeview.DefaultNodeProvider] used by
+// the TUI and instant execution paths. It wires together:
+//   - icon rules (status precedes type so success/error override type icons)
+//   - style rules (normal & focused variants) with precedence similar to icons
+//   - the custom [renameFormatter] for inline original→new labeling.
+func CreateRenameProvider() *treeview.DefaultNodeProvider[treeview.FileInfo] {
+	// Icon rules (order matters: status first)
+	successIconRule := treeview.WithIconRule(statusIs(core.RenameStatusSuccess), "✅")
+	errorIconRule := treeview.WithIconRule(statusIs(core.RenameStatusError), "❌")
+	virtualDirIconRule := treeview.WithIconRule(needsDir(), "➕")
+	showIconRule := treeview.WithIconRule(statusNoneType(core.MediaShow), "📺")
+	seasonIconRule := treeview.WithIconRule(statusNoneType(core.MediaSeason), "📁")
+	episodeIconRule := treeview.WithIconRule(statusNoneType(core.MediaEpisode), "🎬")
+	movieIconRule := treeview.WithIconRule(statusNoneType(core.MediaMovie), "🎬")
+	movieFileIconRule := treeview.WithIconRule(func(n *treeview.Node[treeview.FileInfo]) bool {
+		if media.IsSubtitle(n.Name()) {
+			return false
+		}
+		return statusNoneType(core.MediaMovieFile)(n)
+	}, "🎥")
+	defaultIconRule := treeview.WithDefaultIcon[treeview.FileInfo]("📄")
+
+	// Style rules (most specific first)
+	showStyleRule := treeview.WithStyleRule(
+		typeIs(core.MediaShow),
+		lipgloss.NewStyle().Foreground(colorPrimary).Bold(true),
+		lipgloss.NewStyle().Foreground(colorBackground).Bold(true).Background(colorSecondary).PaddingLeft(1).PaddingRight(1),
+	)
+	seasonStyleRule := treeview.WithStyleRule(
+		typeIs(core.MediaSeason),
+		lipgloss.NewStyle().Foreground(colorSecondary).Bold(true),
+		lipgloss.NewStyle().Foreground(colorBackground).Bold(true).Background(colorPrimary),
+	)
+	episodeStyleRule := treeview.WithStyleRule(
+		typeIs(core.MediaEpisode),
+		lipgloss.NewStyle().Foreground(colorMuted),
+		lipgloss.NewStyle().Foreground(colorBackground).Background(colorPrimary),
+	)
+	movieStyleRule := treeview.WithStyleRule(
+		typeIs(core.MediaMovie),
+		lipgloss.NewStyle().Foreground(colorPrimary).Bold(true),
+		lipgloss.NewStyle().Foreground(colorBackground).Bold(true).Background(colorSecondary).PaddingLeft(1).PaddingRight(1),
+	)
+	movieFileStyleRule := treeview.WithStyleRule(
+		typeIs(core.MediaMovieFile),
+		lipgloss.NewStyle().Foreground(colorMuted),
+		lipgloss.NewStyle().Foreground(colorBackground).Background(colorPrimary),
+	)
+	successStyleRule := treeview.WithStyleRule(
+		statusIs(core.RenameStatusSuccess),
+		lipgloss.NewStyle().Foreground(colorSuccess),
+		lipgloss.NewStyle().Foreground(colorSuccess).Background(colorBackground),
+	)
+	errorStyleRule := treeview.WithStyleRule(
+		statusIs(core.RenameStatusError),
+		lipgloss.NewStyle().Foreground(colorError),
+		lipgloss.NewStyle().Foreground(colorError).Background(colorBackground),
+	)
+	defaultStyleRule := treeview.WithStyleRule(
+		func(*treeview.Node[treeview.FileInfo]) bool { return true },
+		lipgloss.NewStyle().Foreground(colorPrimary),
+		lipgloss.NewStyle().Foreground(colorBackground).Background(colorPrimary),
+	)
+
+	formatterRule := treeview.WithFormatter(RenameFormatter)
+
+	return treeview.NewDefaultNodeProvider(
+		// Icon rules
+		successIconRule, errorIconRule, virtualDirIconRule, showIconRule, seasonIconRule, episodeIconRule, movieIconRule, movieFileIconRule, defaultIconRule,
+		// Style rules
+		successStyleRule, errorStyleRule, showStyleRule, seasonStyleRule, episodeStyleRule, movieStyleRule, movieFileStyleRule, defaultStyleRule,
+		// Formatter
+		formatterRule,
+	)
+}
+
+// RenameFormatter produces the display label for a node during visualization.
+//
+//   - If no metadata or no proposed NewName exists, the original name is returned unchanged.
+//   - On success, only the new name is shown (keeps the tree clean post‑apply).
+//   - On error, the original name plus the error message are shown.
+//   - For virtual directory creation, a [NEW] prefix is prepended to the proposed name.
+//   - If the new name equals the original, the original is shown.
+//   - Otherwise: "<new> ← <old>" conveys the pending rename mapping.
+func RenameFormatter(node *treeview.Node[treeview.FileInfo]) (string, bool) {
+	mm := core.GetMeta(node)
+	if mm == nil || mm.NewName == "" {
+		// no metadata or no proposed rename
+		return node.Name(), true
+	}
+	// Status specific
+	switch mm.RenameStatus {
+	case core.RenameStatusSuccess:
+		return mm.NewName, true
+	case core.RenameStatusError:
+		return fmt.Sprintf("%s: %s", node.Name(), mm.RenameError), true
+	}
+	// Virtual / directory creation
+	if mm.NeedsDirectory {
+		return "[NEW] " + mm.NewName, true
+	}
+	// Unchanged name, keep original
+	if mm.NewName == node.Name() {
+		return node.Name(), true
+	}
+	return fmt.Sprintf("%s ← %s", mm.NewName, node.Name()), true
+}

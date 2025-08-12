@@ -1,0 +1,6 @@
+title-tidy
+.idea
+.vscode
+coverage.out
+coverage.html
+**/.DS_Store
