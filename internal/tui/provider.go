@@ -81,7 +81,7 @@ func CreateRenameProvider() *treeview.DefaultNodeProvider[treeview.FileInfo] {
 	showStyleRule := treeview.WithStyleRule(
 		typeIs(core.MediaShow),
 		lipgloss.NewStyle().Foreground(colorPrimary).Bold(true),
-		lipgloss.NewStyle().Foreground(colorBackground).Bold(true).Background(colorSecondary).PaddingLeft(1).PaddingRight(1),
+		lipgloss.NewStyle().Foreground(colorBackground).Bold(true).Background(colorSecondary).PaddingRight(1),
 	)
 	seasonStyleRule := treeview.WithStyleRule(
 		typeIs(core.MediaSeason),
@@ -96,7 +96,7 @@ func CreateRenameProvider() *treeview.DefaultNodeProvider[treeview.FileInfo] {
 	movieStyleRule := treeview.WithStyleRule(
 		typeIs(core.MediaMovie),
 		lipgloss.NewStyle().Foreground(colorPrimary).Bold(true),
-		lipgloss.NewStyle().Foreground(colorBackground).Bold(true).Background(colorSecondary).PaddingLeft(1).PaddingRight(1),
+		lipgloss.NewStyle().Foreground(colorBackground).Bold(true).Background(colorSecondary).PaddingRight(1),
 	)
 	movieFileStyleRule := treeview.WithStyleRule(
 		typeIs(core.MediaMovieFile),

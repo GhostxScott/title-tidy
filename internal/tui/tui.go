@@ -200,7 +200,7 @@ func (m *RenameModel) renderTwoPanelLayout() string {
 	statsPanel := m.renderStatsPanel()
 	treeView := m.TuiTreeModel.View()
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, treeView, " │ ", statsPanel)
+	return lipgloss.JoinHorizontal(lipgloss.Top, treeView, statsPanel)
 }
 
 // renderStatsPanel builds and formats the statistics panel content.
