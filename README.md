@@ -1,6 +1,6 @@
 # Title Tidy
 
-Title tidy is the quickest way to standardizes your media file names for use in JellyFin, Plex, and Emby. Title tidy uses
+Title tidy is the quickest way to standardizes your media file names for use in Jellyfin, Plex, and Emby. Title tidy uses
 intelligent parsing of folder structures and file names to automatically determine exactly how to name media. Whether you
 need to rename a single episode, a whole season, or any number of shows, Title Tidy does the job in one command. A preview
 is shown before renaming occurs, and Title Tidy will never overwrite content. 
