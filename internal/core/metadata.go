@@ -36,15 +36,17 @@ const (
 //     synthesized movie directories wrapping loose video files.
 //   - NeedsDirectory: Signals that a directory must be created before children
 //     are renamed beneath it (typically paired with IsVirtual).
+//   - MarkedForDeletion: True when the file should be deleted during rename operation.
 //
 // The zero value is meaningful: it encodes an untyped, unprocessed node with no rename proposal.
 type MediaMeta struct {
-	Type           MediaType
-	NewName        string
-	RenameStatus   RenameStatus
-	RenameError    string
-	IsVirtual      bool
-	NeedsDirectory bool
+	Type              MediaType
+	NewName           string
+	RenameStatus      RenameStatus
+	RenameError       string
+	IsVirtual         bool
+	NeedsDirectory    bool
+	MarkedForDeletion bool
 }
 
 // GetMeta retrieves the existing *MediaMeta attached to n or nil when absent.

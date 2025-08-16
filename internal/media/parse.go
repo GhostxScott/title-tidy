@@ -50,6 +50,12 @@ var (
 
 	// simpleNumberRe matches a standalone number that might represent a season.
 	simpleNumberRe = regexp.MustCompile(`^(\d+)|[\s\.\-_](\d+)(?:[\s\.\-_]|$)`)
+
+	// nfoRe matches NFO info file extensions.
+	nfoRe = regexp.MustCompile(`(?i)\.nfo$`)
+
+	// imageRe matches common image file extensions.
+	imageRe = regexp.MustCompile(`(?i)\.(jpg|jpeg|png|gif|bmp|webp|tiff?|ico|svg)$`)
 )
 
 // IsVideo reports whether filename has a recognized video extension.
@@ -62,6 +68,16 @@ func IsSubtitle(filename string) bool {
 	return subtitleRe.MatchString(filename)
 }
 
+// IsNFO reports whether filename has an NFO extension.
+func IsNFO(filename string) bool {
+	return nfoRe.MatchString(filename)
+}
+
+// IsImage reports whether filename has a recognized image extension.
+func IsImage(filename string) bool {
+	return imageRe.MatchString(filename)
+}
+
 // ExtractSubtitleSuffix extracts the language code and extension from subtitle files.
 // For example: "movie.en.srt" returns ".en.srt", "movie.srt" returns ".srt"
 // Also handles cases like "movie.eng.srt", "movie.en-US.srt", etc.
@@ -72,7 +88,7 @@ func ExtractSubtitleSuffix(filename string) string {
 
 	// Find the subtitle extension first
 	subtitleMatch := subtitleRe.FindStringIndex(filename)
-	if subtitleMatch == nil || len(subtitleMatch) == 0 {
+	if len(subtitleMatch) == 0 {
 		return ""
 	}
 

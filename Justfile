@@ -75,7 +75,7 @@ demo target:
 		exit 1
 	fi
 	echo "Entering demo dataset directory: $data_dir"
-	( cd "$data_dir" && echo "Running: title-tidy $mode" && title-tidy "$mode" )
+	( cd "$data_dir" && echo "Running: title-tidy $mode" && title-tidy "$mode" --no-nfo --no-img)
 	echo "Cleaning up demo dataset: $data_dir"
 	rm -rf "$data_dir"
 	echo "Demo $mode complete and cleaned."

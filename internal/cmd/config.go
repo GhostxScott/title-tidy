@@ -3,11 +3,13 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/Digital-Shane/title-tidy/internal/media"
-	"github.com/Digital-Shane/title-tidy/internal/tui"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/Digital-Shane/title-tidy/internal/core"
+	"github.com/Digital-Shane/title-tidy/internal/media"
+	"github.com/Digital-Shane/title-tidy/internal/tui"
 
 	"github.com/Digital-Shane/treeview"
 	tea "github.com/charmbracelet/bubbletea"
@@ -21,13 +23,17 @@ import (
 //   - annotate: optional pass to attach MediaMeta (type + proposed name).
 //   - movieMode: toggles movie-oriented statistics & wording in the TUI.
 //   - InstantMode: apply renames immediately without interactive preview.
+//   - DeleteNFO: mark NFO files for deletion during rename.
+//   - DeleteImages: mark image files for deletion during rename.
 type CommandConfig struct {
-	maxDepth    int
-	includeDirs bool
-	preprocess  func([]*treeview.Node[treeview.FileInfo]) []*treeview.Node[treeview.FileInfo]
-	annotate    func(*treeview.Tree[treeview.FileInfo])
-	movieMode   bool
-	InstantMode bool
+	maxDepth     int
+	includeDirs  bool
+	preprocess   func([]*treeview.Node[treeview.FileInfo]) []*treeview.Node[treeview.FileInfo]
+	annotate     func(*treeview.Tree[treeview.FileInfo])
+	movieMode    bool
+	InstantMode  bool
+	DeleteNFO    bool
+	DeleteImages bool
 }
 
 func RunCommand(cfg CommandConfig) error {
@@ -54,14 +60,19 @@ func RunCommand(cfg CommandConfig) error {
 		cfg.annotate(t)
 	}
 
+	// Mark files for deletion based on flags
+	MarkFilesForDeletion(t, cfg.DeleteNFO, cfg.DeleteImages)
+
+	// Create model
+	model := tui.NewRenameModel(t)
+	model.IsMovieMode = cfg.movieMode
+	model.DeleteNFO = cfg.DeleteNFO
+	model.DeleteImages = cfg.DeleteImages
+
 	// If instant mode, perform renames immediately
 	if cfg.InstantMode {
-		model := tui.NewRenameModel(t)
-		model.IsMovieMode = cfg.movieMode
-		// Execute the renames directly using the same PerformRenames method
 		cmd := model.PerformRenames()
 		if cmd != nil {
-			// Execute the command function to get the result
 			msg := cmd()
 			if result, ok := msg.(tui.RenameCompleteMsg); ok {
 				if result.ErrorCount() > 0 {
@@ -73,8 +84,6 @@ func RunCommand(cfg CommandConfig) error {
 	}
 
 	// Launch TUI
-	model := tui.NewRenameModel(t)
-	model.IsMovieMode = cfg.movieMode
 	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err = p.Run()
 	return err
@@ -88,9 +97,9 @@ func CreateMediaFilter(includeDirectories bool) func(info treeview.FileInfo) boo
 			return false
 		}
 		if includeDirectories {
-			return info.IsDir() || media.IsSubtitle(info.Name()) || media.IsVideo(info.Name())
+			return info.IsDir() || media.IsSubtitle(info.Name()) || media.IsVideo(info.Name()) || media.IsNFO(info.Name()) || media.IsImage(info.Name())
 		}
-		return media.IsSubtitle(info.Name()) || media.IsVideo(info.Name())
+		return media.IsSubtitle(info.Name()) || media.IsVideo(info.Name()) || media.IsNFO(info.Name()) || media.IsImage(info.Name())
 	}
 }
 
@@ -122,3 +131,32 @@ func (m *SimpleFileInfo) Mode() os.FileMode {
 func (m *SimpleFileInfo) ModTime() time.Time { return time.Now() }
 func (m *SimpleFileInfo) IsDir() bool        { return m.isDir }
 func (m *SimpleFileInfo) Sys() any           { return nil }
+
+// MarkFilesForDeletion traverses the tree and marks NFO and/or image files for deletion
+func MarkFilesForDeletion(t *treeview.Tree[treeview.FileInfo], deleteNFO, deleteImages bool) {
+	if !deleteNFO && !deleteImages {
+		return
+	}
+
+	for ni := range t.All(context.Background()) {
+		if ni.Node.Data().IsDir() {
+			continue
+		}
+
+		filename := ni.Node.Name()
+		shouldDelete := false
+
+		if deleteNFO && media.IsNFO(filename) {
+			shouldDelete = true
+		}
+
+		if deleteImages && media.IsImage(filename) {
+			shouldDelete = true
+		}
+
+		if shouldDelete {
+			meta := core.EnsureMeta(ni.Node)
+			meta.MarkedForDeletion = true
+		}
+	}
+}

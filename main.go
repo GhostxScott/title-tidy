@@ -42,6 +42,8 @@ func main() {
 	flags := flag.NewFlagSet(command, flag.ExitOnError)
 	instant := flags.Bool("i", false, "Apply renames immediately without interactive preview")
 	flags.BoolVar(instant, "instant", false, "Apply renames immediately without interactive preview")
+	noNFO := flags.Bool("no-nfo", false, "Delete NFO files during rename")
+	noImages := flags.Bool("no-img", false, "Delete image files during rename")
 	
 	// Parse remaining arguments after the command
 	if err := flags.Parse(os.Args[2:]); err != nil {
@@ -49,8 +51,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Set instant mode in config
+	// Set flags in config
 	cfg.InstantMode = *instant
+	cfg.DeleteNFO = *noNFO
+	cfg.DeleteImages = *noImages
 
 	if err := cmd.RunCommand(cfg); err != nil {
 		fmt.Printf("Error: %v\n", err)
@@ -68,4 +72,6 @@ func printUsage() {
 	 fmt.Printf("  title-tidy help      Show this help message\n\n")
 	fmt.Printf("Options:\n")
 	fmt.Printf("  -i, --instant          Apply renames immediately and exit\n")
+	fmt.Printf("  --no-nfo               Delete NFO files during rename\n")
+	fmt.Printf("  --no-img               Delete image files during rename\n")
 }
