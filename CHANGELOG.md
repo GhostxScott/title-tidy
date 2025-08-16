@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Extra vertical bar next to stat panel.
 - Extra left padding for root level nodes.
+- Page up and Page down support.
+- Scroll wheel support. 
 
 ## [v1.0.0] - 2025-08-12
 ### Released

@@ -75,7 +75,7 @@ func RunCommand(cfg CommandConfig) error {
 	// Launch TUI
 	model := tui.NewRenameModel(t)
 	model.IsMovieMode = cfg.movieMode
-	p := tea.NewProgram(model, tea.WithAltScreen())
+	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err = p.Run()
 	return err
 }

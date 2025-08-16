@@ -132,10 +132,42 @@ func (m *RenameModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case tea.KeyMsg:
-		// Handle rename key
-		if msg.String() == "r" && !m.renameInProgress {
-			m.renameInProgress = true
-			return m, m.PerformRenames()
+		// Handle custom keys before passing to tree model
+		switch msg.String() {
+		case "r":
+			if !m.renameInProgress {
+				m.renameInProgress = true
+				return m, m.PerformRenames()
+			}
+		case "pgup":
+			// Page up - move up by viewport height
+			pageSize := m.treeHeight
+			if pageSize <= 0 {
+				pageSize = 10
+			}
+			m.TuiTreeModel.Tree.Move(context.Background(), -pageSize)
+			return m, nil
+		case "pgdown":
+			// Page down - move down by viewport height
+			pageSize := m.treeHeight
+			if pageSize <= 0 {
+				pageSize = 10
+			}
+			m.TuiTreeModel.Tree.Move(context.Background(), pageSize)
+			return m, nil
+		}
+	
+	case tea.MouseMsg:
+		// Handle mouse wheel scrolling
+		switch msg.Type {
+		case tea.MouseWheelUp:
+			// Scroll up by 1 line
+			m.TuiTreeModel.Tree.Move(context.Background(), -1)
+			return m, nil
+		case tea.MouseWheelDown:
+			// Scroll down by 1 line
+			m.TuiTreeModel.Tree.Move(context.Background(), 1)
+			return m, nil
 		}
 
 	case RenameCompleteMsg:
@@ -191,7 +223,7 @@ func (m *RenameModel) renderHeader() string {
 func (m *RenameModel) renderStatusBar() string {
 	style := statusStyleBase.Width(m.width)
 
-	statusText := "↑↓: Navigate  ←→: Expand/Collapse  │  r: Rename all files  │  esc: Quit"
+	statusText := "↑↓: Navigate  PgUp/PgDn: Page  ←→: Expand/Collapse  │  r: Rename  │  esc: Quit"
 	return style.Render(statusText)
 }
 
