@@ -20,7 +20,9 @@ media files, and you'll see a preview of all proposed changes. Nothing gets rena
 title-tidy [command]
 ```
 
-Add the `-i` or `--instant` flag to apply changes immediately without the interactive preview.
+* Add the `-i` or `--instant` flag to apply changes immediately without the interactive preview.
+* The `--no-nfo` flag will delete nfo files during the rename process.
+* The `--no-img` flag will delete image files during the rename process.
 
 ## Commands
 
@@ -35,7 +37,7 @@ the entire directory structure: show folders, season folders, and all episode fi
 command can process multiple shows at once. Episode files named only after the episode
 will retrieve the season number from the parent directory name. 
 
-![shows demo](https://vhs.charm.sh/vhs-4azhoxRPBT1c1bZ5lcxIWp.gif)
+![shows demo](https://vhs.charm.sh/vhs-5KIKITpGcbCmfDzfZrACo4.gif)
 
 **Before → After examples:**
 ```

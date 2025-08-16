@@ -15,7 +15,7 @@ Type "clear"
 Enter
 Show
 
-Type "title-tidy shows"
+Type "title-tidy shows --no-nfo --no-img"
 Sleep 1s
 Enter
 Sleep 500ms

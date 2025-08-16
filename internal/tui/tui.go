@@ -40,6 +40,8 @@ type RenameModel struct {
 	width            int
 	height           int
 	IsMovieMode      bool
+	DeleteNFO        bool
+	DeleteImages     bool
 
 	// Layout metrics
 	treeWidth   int
@@ -264,6 +266,9 @@ func (m *RenameModel) renderStatsPanel() string {
 	b.WriteString("\nRename Status:\n")
 	fmt.Fprintf(&b, "  ✓ Need rename:  %d\n", stats.needRenameCount)
 	fmt.Fprintf(&b, "  = No change:    %d\n", stats.noChangeCount)
+	if stats.toDeleteCount > 0 {
+		fmt.Fprintf(&b, "  🗑 To delete:    %d\n", stats.toDeleteCount)
+	}
 
 	if stats.successCount > 0 || stats.errorCount > 0 {
 		b.WriteString("\nLast Operation:\n")
@@ -301,6 +306,7 @@ func (m *RenameModel) renderStatsPanel() string {
 //   - needRenameCount: nodes where NewName differs from current name.
 //   - noChangeCount: nodes with a proposed name identical to current name.
 //   - successCount / errorCount: results from the last performRenames run.
+//   - toDeleteCount: nodes marked for deletion.
 type Statistics struct {
 	showCount       int
 	seasonCount     int
@@ -312,6 +318,7 @@ type Statistics struct {
 	noChangeCount   int
 	successCount    int
 	errorCount      int
+	toDeleteCount   int
 }
 
 // calculateStats walks the tree to produce aggregate counts while preserving
@@ -347,7 +354,9 @@ func (m *RenameModel) calculateStats() Statistics {
 		if !node.Data().IsDir() && media.IsSubtitle(node.Data().Name()) {
 			stats.subtitleCount++
 		}
-		if mm.NewName != "" {
+		if mm.MarkedForDeletion {
+			stats.toDeleteCount++
+		} else if mm.NewName != "" {
 			if mm.NewName != node.Name() {
 				stats.needRenameCount++
 			} else {
@@ -376,6 +385,19 @@ func (m *RenameModel) PerformRenames() tea.Cmd {
 			}
 			node := nodeInfo.Node
 			mm := core.GetMeta(node)
+			
+			// Handle file deletion if marked
+			if mm != nil && mm.MarkedForDeletion {
+				if err := os.Remove(node.Data().Path); err != nil {
+					mm.Fail(err)
+					errs = append(errs, err)
+				} else {
+					mm.Success()
+					successCount++
+				}
+				continue
+			}
+			
 			if mm == nil || mm.NewName == "" {
 				continue
 			}

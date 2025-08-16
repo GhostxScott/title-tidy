@@ -55,6 +55,21 @@ func needsDir() func(*treeview.Node[treeview.FileInfo]) bool {
 	return metaRule(func(mm *core.MediaMeta) bool { return mm.RenameStatus == core.RenameStatusNone && mm.NeedsDirectory })
 }
 
+// markedForDeletion matches nodes marked for deletion
+func markedForDeletion() func(*treeview.Node[treeview.FileInfo]) bool {
+	return metaRule(func(mm *core.MediaMeta) bool { return mm.MarkedForDeletion && mm.RenameStatus == core.RenameStatusNone })
+}
+
+// deletionSuccess matches successfully deleted nodes  
+func deletionSuccess() func(*treeview.Node[treeview.FileInfo]) bool {
+	return metaRule(func(mm *core.MediaMeta) bool { return mm.MarkedForDeletion && mm.RenameStatus == core.RenameStatusSuccess })
+}
+
+// deletionError matches nodes that failed to delete
+func deletionError() func(*treeview.Node[treeview.FileInfo]) bool {
+	return metaRule(func(mm *core.MediaMeta) bool { return mm.MarkedForDeletion && mm.RenameStatus == core.RenameStatusError })
+}
+
 // CreateRenameProvider constructs the [treeview.DefaultNodeProvider] used by
 // the TUI and instant execution paths. It wires together:
 //   - icon rules (status precedes type so success/error override type icons)
@@ -62,6 +77,11 @@ func needsDir() func(*treeview.Node[treeview.FileInfo]) bool {
 //   - the custom [renameFormatter] for inline original→new labeling.
 func CreateRenameProvider() *treeview.DefaultNodeProvider[treeview.FileInfo] {
 	// Icon rules (order matters: status first)
+	// Deletion status icons (highest priority)
+	deletionSuccessIconRule := treeview.WithIconRule(deletionSuccess(), "✅")
+	deletionErrorIconRule := treeview.WithIconRule(deletionError(), "❌")
+	markedForDeletionIconRule := treeview.WithIconRule(markedForDeletion(), "❌")
+	// Regular status icons
 	successIconRule := treeview.WithIconRule(statusIs(core.RenameStatusSuccess), "✅")
 	errorIconRule := treeview.WithIconRule(statusIs(core.RenameStatusError), "❌")
 	virtualDirIconRule := treeview.WithIconRule(needsDir(), "➕")
@@ -113,6 +133,17 @@ func CreateRenameProvider() *treeview.DefaultNodeProvider[treeview.FileInfo] {
 		lipgloss.NewStyle().Foreground(colorError),
 		lipgloss.NewStyle().Foreground(colorError).Background(colorBackground),
 	)
+	// Deletion style rules
+	markedForDeletionStyleRule := treeview.WithStyleRule(
+		markedForDeletion(),
+		lipgloss.NewStyle().Foreground(colorError).Strikethrough(true),
+		lipgloss.NewStyle().Foreground(colorError).Background(colorBackground).Strikethrough(true),
+	)
+	deletionSuccessStyleRule := treeview.WithStyleRule(
+		deletionSuccess(),
+		lipgloss.NewStyle().Foreground(colorMuted).Strikethrough(true),
+		lipgloss.NewStyle().Foreground(colorBackground).Background(colorMuted).Strikethrough(true),
+	)
 	defaultStyleRule := treeview.WithStyleRule(
 		func(*treeview.Node[treeview.FileInfo]) bool { return true },
 		lipgloss.NewStyle().Foreground(colorPrimary),
@@ -122,10 +153,11 @@ func CreateRenameProvider() *treeview.DefaultNodeProvider[treeview.FileInfo] {
 	formatterRule := treeview.WithFormatter(RenameFormatter)
 
 	return treeview.NewDefaultNodeProvider(
-		// Icon rules
+		// Icon rules (order matters - most specific first)
+		deletionSuccessIconRule, deletionErrorIconRule, markedForDeletionIconRule,
 		successIconRule, errorIconRule, virtualDirIconRule, showIconRule, seasonIconRule, episodeIconRule, movieIconRule, movieFileIconRule, defaultIconRule,
-		// Style rules
-		successStyleRule, errorStyleRule, showStyleRule, seasonStyleRule, episodeStyleRule, movieStyleRule, movieFileStyleRule, defaultStyleRule,
+		// Style rules (order matters - most specific first)
+		deletionSuccessStyleRule, markedForDeletionStyleRule, successStyleRule, errorStyleRule, showStyleRule, seasonStyleRule, episodeStyleRule, movieStyleRule, movieFileStyleRule, defaultStyleRule,
 		// Formatter
 		formatterRule,
 	)
@@ -141,8 +173,20 @@ func CreateRenameProvider() *treeview.DefaultNodeProvider[treeview.FileInfo] {
 //   - Otherwise: "<new> ← <old>" conveys the pending rename mapping.
 func RenameFormatter(node *treeview.Node[treeview.FileInfo]) (string, bool) {
 	mm := core.GetMeta(node)
-	if mm == nil || mm.NewName == "" {
-		// no metadata or no proposed rename
+	if mm == nil {
+		return node.Name(), true
+	}
+	
+	// File marked for deletion - show just the filename (icon handles the status)
+	if mm.MarkedForDeletion {
+		if mm.RenameStatus == core.RenameStatusError {
+			return fmt.Sprintf("%s: %s", node.Name(), mm.RenameError), true
+		}
+		return node.Name(), true
+	}
+	
+	if mm.NewName == "" {
+		// no proposed rename
 		return node.Name(), true
 	}
 	// Status specific
