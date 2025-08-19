@@ -3,10 +3,10 @@ package cmd
 import (
 	"testing"
 
+	"github.com/Digital-Shane/title-tidy/internal/core"
 	"github.com/Digital-Shane/treeview"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/Digital-Shane/title-tidy/internal/core"
 )
 
 func TestMoviePreprocess_GroupsLooseFiles(t *testing.T) {

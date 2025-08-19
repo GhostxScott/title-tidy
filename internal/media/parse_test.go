@@ -3,9 +3,9 @@ package media
 import (
 	"testing"
 
+	"github.com/Digital-Shane/title-tidy/internal/core"
 	"github.com/Digital-Shane/treeview"
 	"github.com/google/go-cmp/cmp"
-	"github.com/Digital-Shane/title-tidy/internal/core"
 )
 
 // Helper to build a season parent node with a single child (episode file)

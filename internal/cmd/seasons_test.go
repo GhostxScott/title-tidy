@@ -3,8 +3,8 @@ package cmd
 import (
 	"testing"
 
-	"github.com/Digital-Shane/treeview"
 	"github.com/Digital-Shane/title-tidy/internal/core"
+	"github.com/Digital-Shane/treeview"
 )
 
 func TestSeasonsCommandAnnotate(t *testing.T) {

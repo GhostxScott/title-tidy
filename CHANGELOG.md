@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.2.0] - 2025-08-19
+### Added
+- Progress bar during file indexing.
+  - Is fairly accurate and quick by tracking root level nodes processed over pre indexing the whole file tree.
+- Progress bar to track the status of delete, rename, and create directory operations.
+### Updated
+- Go Dependencies.
+- Stat panel to hug the right side of the terminal.
+- Run `go fmt ./...` on the project.
+- All demo gifs.
+
 ## [v1.1.1] - 2025-08-17
 ### Updated
 - treeview dependency to v1.5.1 to vastly improve render performance for large trees.

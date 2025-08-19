@@ -10,6 +10,7 @@ import (
 	"github.com/Digital-Shane/title-tidy/internal/media"
 
 	"github.com/Digital-Shane/treeview"
+	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -37,6 +38,14 @@ type RenameModel struct {
 	renameComplete   bool
 	successCount     int
 	errorCount       int
+	totalRenameOps   int
+	completedOps     int
+	progressModel    progress.Model
+	progressVisible  bool
+	currentOpIndex   int
+	virtualDirCount  int
+	deletionCount    int
+	renameCount      int
 	width            int
 	height           int
 	IsMovieMode      bool
@@ -62,6 +71,8 @@ func NewRenameModel(tree *treeview.Tree[treeview.FileInfo]) *RenameModel {
 		height:     24,
 		statsDirty: true,
 	}
+	m.progressModel = progress.New(progress.WithGradient(string(colorPrimary), string(colorAccent)))
+	m.progressModel.Width = 40
 	// establish initial layout metrics before building underlying model
 	m.CalculateLayout()
 	m.TuiTreeModel = m.createSizedTuiModel(tree)
@@ -139,26 +150,22 @@ func (m *RenameModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "r":
 			if !m.renameInProgress {
 				m.renameInProgress = true
+				m.prepareRenameProgress()
+				m.progressVisible = true
 				return m, m.PerformRenames()
 			}
 		case "pgup":
 			// Page up - move up by viewport height
-			pageSize := m.treeHeight
-			if pageSize <= 0 {
-				pageSize = 10
-			}
+			pageSize := max(m.treeHeight, 10)
 			m.TuiTreeModel.Tree.Move(context.Background(), -pageSize)
 			return m, nil
 		case "pgdown":
 			// Page down - move down by viewport height
-			pageSize := m.treeHeight
-			if pageSize <= 0 {
-				pageSize = 10
-			}
+			pageSize := max(m.treeHeight, 10)
 			m.TuiTreeModel.Tree.Move(context.Background(), pageSize)
 			return m, nil
 		}
-	
+
 	case tea.MouseMsg:
 		// Handle mouse wheel scrolling
 		switch msg.Type {
@@ -178,7 +185,22 @@ func (m *RenameModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.successCount = msg.successCount
 		m.errorCount = msg.errorCount
 		m.statsDirty = true
+		m.progressVisible = false
 		return m, nil
+	case renameProgressMsg:
+		// update bar percent
+		var pct float64
+		if m.totalRenameOps > 0 {
+			pct = min(float64(m.completedOps)/float64(m.totalRenameOps), 1)
+		}
+		cmd := m.progressModel.SetPercent(pct)
+		// schedule next step until completion
+		return m, tea.Batch(cmd, m.PerformRenames())
+	case progress.FrameMsg:
+		// propagate animation frames for the progress bar so percent updates render
+		pm, cmd := m.progressModel.Update(msg)
+		m.progressModel = pm.(progress.Model)
+		return m, cmd
 	}
 
 	// Pass through to embedded tree model for other messages
@@ -223,10 +245,21 @@ func (m *RenameModel) renderHeader() string {
 
 // renderStatusBar renders a single line of key hints and actions.
 func (m *RenameModel) renderStatusBar() string {
-	style := statusStyleBase.Width(m.width)
-
+	if m.progressVisible && m.renameInProgress {
+		// show progress bar with styled text
+		bar := m.progressModel.View()
+		// Style the text with the same background as the right side of the gradient
+		textStyle := lipgloss.NewStyle().
+			Background(colorSecondary).
+			Foreground(colorBackground).
+			Padding(0, 1)
+		statusText := textStyle.Render(fmt.Sprintf("%d/%d - Renaming...", m.completedOps, m.totalRenameOps))
+		// Combine bar and styled text, then apply the full width style
+		combined := fmt.Sprintf("%s  %s", bar, statusText)
+		return statusStyleBase.Width(m.width).Render(combined)
+	}
 	statusText := "↑↓: Navigate  PgUp/PgDn: Page  ←→: Expand/Collapse  │  r: Rename  │  esc: Quit"
-	return style.Render(statusText)
+	return statusStyleBase.Width(m.width).Render(statusText)
 }
 
 // renderTwoPanelLayout joins the tree view and statistics panel horizontally.
@@ -234,7 +267,12 @@ func (m *RenameModel) renderTwoPanelLayout() string {
 	statsPanel := m.renderStatsPanel()
 	treeView := m.TuiTreeModel.View()
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, treeView, statsPanel)
+	// Force tree view to use exact allocated width to prevent stats panel from jumping
+	treeContainer := lipgloss.NewStyle().
+		Width(m.treeWidth).
+		Render(treeView)
+
+	return lipgloss.JoinHorizontal(lipgloss.Top, treeContainer, statsPanel)
 }
 
 // renderStatsPanel builds and formats the statistics panel content.
@@ -278,6 +316,15 @@ func (m *RenameModel) renderStatsPanel() string {
 		if stats.errorCount > 0 {
 			fmt.Fprintf(&b, "  ❌ Errors:      %d\n", stats.errorCount)
 		}
+	}
+
+	if m.progressVisible && m.renameInProgress {
+		percent := 0
+		if m.totalRenameOps > 0 {
+			percent = (m.completedOps * 100) / m.totalRenameOps
+		}
+		b.WriteString("\nRename Progress:\n")
+		fmt.Fprintf(&b, "  %d/%d (%d%%)\n", m.completedOps, m.totalRenameOps, percent)
 	}
 
 	var totalItems int
@@ -369,63 +416,4 @@ func (m *RenameModel) calculateStats() Statistics {
 	m.statsCache = stats
 	m.statsDirty = false
 	return stats
-}
-
-// PerformRenames walks the tree bottom‑up executing pending rename operations.
-// It skips children of virtual directories (handled by the virtual parent) and
-// aggregates success / error counts into a renameCompleteMsg.
-func (m *RenameModel) PerformRenames() tea.Cmd {
-	return func() tea.Msg {
-		var successCount int
-		var errs []error
-		for nodeInfo, iterErr := range m.Tree.AllBottomUp(context.Background()) {
-			if iterErr != nil {
-				errs = append(errs, fmt.Errorf("iterator: %w", iterErr))
-				break
-			}
-			node := nodeInfo.Node
-			mm := core.GetMeta(node)
-			
-			// Handle file deletion if marked
-			if mm != nil && mm.MarkedForDeletion {
-				if err := os.Remove(node.Data().Path); err != nil {
-					mm.Fail(err)
-					errs = append(errs, err)
-				} else {
-					mm.Success()
-					successCount++
-				}
-				continue
-			}
-			
-			if mm == nil || mm.NewName == "" {
-				continue
-			}
-			// Skip children inside virtual containers (handled by createVirtualDir)
-			if parent := node.Parent(); parent != nil {
-				if pm := core.GetMeta(parent); pm != nil && pm.IsVirtual {
-					continue
-				}
-			}
-
-			// Virtual directory creation
-			if mm.NeedsDirectory && mm.IsVirtual {
-				s, vErrs := CreateVirtualDir(node, mm)
-				successCount += s
-				errs = append(errs, vErrs...)
-				continue
-			}
-
-			// Regular rename
-			if renamed, err := RenameRegular(node, mm); err != nil {
-				errs = append(errs, err)
-			} else if renamed {
-				successCount++
-			}
-		}
-		return RenameCompleteMsg{
-			successCount: successCount,
-			errorCount:   len(errs),
-		}
-	}
 }

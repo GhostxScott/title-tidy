@@ -44,7 +44,7 @@ func main() {
 	flags.BoolVar(instant, "instant", false, "Apply renames immediately without interactive preview")
 	noNFO := flags.Bool("no-nfo", false, "Delete NFO files during rename")
 	noImages := flags.Bool("no-img", false, "Delete image files during rename")
-	
+
 	// Parse remaining arguments after the command
 	if err := flags.Parse(os.Args[2:]); err != nil {
 		fmt.Printf("Error parsing flags: %v\n", err)
@@ -63,13 +63,13 @@ func main() {
 }
 
 func printUsage() {
-	 fmt.Printf("title-tidy - A tool for renaming media files\n\n")
+	fmt.Printf("title-tidy - A tool for renaming media files\n\n")
 	fmt.Printf("Usage:\n")
-	 fmt.Printf("  title-tidy shows     Rename TV show files and folders\n")
-	 fmt.Printf("  title-tidy seasons   Rename season folders and episodes within\n")
-	 fmt.Printf("  title-tidy episodes  Rename episode files in current directory\n")
-	 fmt.Printf("  title-tidy movies    Rename movie files and folders\n")
-	 fmt.Printf("  title-tidy help      Show this help message\n\n")
+	fmt.Printf("  title-tidy shows     Rename TV show files and folders\n")
+	fmt.Printf("  title-tidy seasons   Rename season folders and episodes within\n")
+	fmt.Printf("  title-tidy episodes  Rename episode files in current directory\n")
+	fmt.Printf("  title-tidy movies    Rename movie files and folders\n")
+	fmt.Printf("  title-tidy help      Show this help message\n\n")
 	fmt.Printf("Options:\n")
 	fmt.Printf("  -i, --instant          Apply renames immediately and exit\n")
 	fmt.Printf("  --no-nfo               Delete NFO files during rename\n")
