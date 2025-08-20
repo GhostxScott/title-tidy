@@ -454,3 +454,100 @@ func TestRemoveNodeFromTree(t *testing.T) {
 		})
 	}
 }
+
+func TestKeyHandling(t *testing.T) {
+	t.Parallel()
+	m := NewRenameModel(buildTVTestTree())
+	
+	// Test 'd' key (delete)
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	if cmd != nil {
+		t.Errorf("Update('d') cmd = %v, want nil", cmd)
+	}
+	
+	// Should still return the model
+	if rm, ok := updated.(*RenameModel); !ok {
+		t.Errorf("Update('d') returned %T, want *RenameModel", updated)
+	} else if rm != m {
+		t.Errorf("Update('d') returned different model")
+	}
+}
+
+func TestDeleteFilesMode(t *testing.T) {
+	t.Parallel()
+	n := tuiTestNode("delete.nfo", false)
+	nm := core.EnsureMeta(n)
+	nm.MarkedForDeletion = true
+	
+	tree := treeview.NewTree([]*treeview.Node[treeview.FileInfo]{n}, 
+		treeview.WithProvider(CreateRenameProvider()))
+	m := NewRenameModel(tree)
+	m.DeleteNFO = true
+	m.DeleteImages = true
+	
+	// Should not affect other counts since files marked for deletion
+	// are handled differently in statistics
+	stats := m.calculateStats()
+	if stats.needRenameCount != 0 && stats.noChangeCount != 0 {
+		t.Errorf("calculateStats() with marked for deletion affects rename counts")
+	}
+}
+
+func TestPageKeysMinimalHeight(t *testing.T) {
+	t.Parallel()
+	// Test page keys with minimal tree height to trigger max() logic
+	m := NewRenameModel(buildTVTestTree())
+	m.treeHeight = 5 // Less than 10, should use 10 as pageSize
+	
+	// Test that page keys work with small tree height
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("pgup")})
+	if cmd != nil {
+		t.Errorf("Update(pgup small height) cmd = %v, want nil", cmd)
+	}
+	
+	_, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("pgdown")})
+	if cmd != nil {
+		t.Errorf("Update(pgdown small height) cmd = %v, want nil", cmd)
+	}
+}
+
+func TestMouseWheelScrolling(t *testing.T) {
+	t.Parallel()
+	// Test mouse wheel handling (lines 178-188)
+	m := NewRenameModel(buildTVTestTree())
+	
+	// Test Mouse Wheel Up
+	updated, cmd := m.Update(tea.MouseMsg{Type: tea.MouseWheelUp})
+	if cmd != nil {
+		t.Errorf("Update(mouse wheel up) cmd = %v, want nil", cmd)
+	}
+	if _, ok := updated.(*RenameModel); !ok {
+		t.Errorf("Update(mouse wheel up) returned %T, want *RenameModel", updated)
+	}
+	
+	// Test Mouse Wheel Down
+	updated, cmd = m.Update(tea.MouseMsg{Type: tea.MouseWheelDown})
+	if cmd != nil {
+		t.Errorf("Update(mouse wheel down) cmd = %v, want nil", cmd)
+	}
+	if _, ok := updated.(*RenameModel); !ok {
+		t.Errorf("Update(mouse wheel down) returned %T, want *RenameModel", updated)
+	}
+}
+
+func TestProgressMessages(t *testing.T) {
+	t.Parallel()
+	// Test progress message handling
+	m := NewRenameModel(buildTVTestTree())
+	
+	// Test rename progress message 
+	updated, cmd := m.Update(renameProgressMsg{})
+	if cmd == nil {
+		t.Errorf("Update(renameProgressMsg) cmd = nil, want non-nil")
+	}
+	
+	rm := updated.(*RenameModel)
+	if rm == nil {
+		t.Errorf("Update(renameProgressMsg) returned nil model")
+	}
+}

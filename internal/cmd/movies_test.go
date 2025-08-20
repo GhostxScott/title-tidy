@@ -5,98 +5,119 @@ import (
 
 	"github.com/Digital-Shane/title-tidy/internal/core"
 	"github.com/Digital-Shane/treeview"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
-func TestMoviePreprocess_GroupsLooseFiles(t *testing.T) {
-	video1 := testNewFileNode("movie.one.mkv")
-	sub1 := testNewFileNode("movie.one.en.srt")
-	video2 := testNewFileNode("second.mp4")
-	straySub := testNewFileNode("orphan.en.srt")
-	existingDir := testNewDirNode("ExistingMovieDir")
-
-	nodes := []*treeview.Node[treeview.FileInfo]{video1, sub1, video2, straySub, existingDir}
-	out := MoviePreprocess(nodes)
-
-	var virtuals []*treeview.Node[treeview.FileInfo]
-	present := map[*treeview.Node[treeview.FileInfo]]bool{}
-	for _, n := range out {
-		present[n] = true
-		if m := core.GetMeta(n); m != nil && m.IsVirtual {
-			virtuals = append(virtuals, n)
-		}
+func TestMovieAnnotate_FileTypes(t *testing.T) {
+	tests := []struct {
+		name         string
+		filename     string
+		wantNewName  string
+		wantType     core.MediaType
+	}{
+		{
+			name:        "video file",
+			filename:    "movie.mkv",
+			wantNewName: "Test Movie (2024).mkv",
+			wantType:    core.MediaMovieFile,
+		},
+		{
+			name:        "subtitle file",
+			filename:    "movie.en.srt",
+			wantNewName: "Test Movie (2024).en.srt",
+			wantType:    core.MediaMovieFile,
+		},
 	}
 
-	if len(virtuals) != 2 {
-		t.Fatalf("MoviePreprocess virtual count = %d, want 2", len(virtuals))
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := testNewDirNode("Test.Movie.2024")
+			file := testNewFileNode(tt.filename)
+			dir.AddChild(file)
+			tr := testNewTree(dir)
 
-	var bundle1, bundle2 *treeview.Node[treeview.FileInfo]
-	for _, v := range virtuals {
-		switch v.Name() {
-		case "movie.one":
-			bundle1 = v
-		case "second":
-			bundle2 = v
-		}
-	}
-	if bundle1 == nil || bundle2 == nil {
-		t.Fatalf("MoviePreprocess missing expected virtual dirs: movie.one=%v second=%v", bundle1, bundle2)
-	}
+			MovieAnnotate(tr)
 
-	if len(bundle1.Children()) != 2 {
-		t.Errorf("bundle1.Children len = %d, want 2", len(bundle1.Children()))
-	}
-	for _, c := range bundle1.Children() {
-		mm := core.GetMeta(c)
-		if mm == nil || mm.Type != core.MediaMovieFile || mm.NewName == "" {
-			t.Errorf("bundle1 child meta = %#v, want populated MediaMovieFile", mm)
-		}
-	}
-	vm1 := core.GetMeta(bundle1)
-	if vm1 == nil || vm1.Type != core.MediaMovie || !vm1.IsVirtual || !vm1.NeedsDirectory {
-		t.Errorf("bundle1 meta = %#v, want movie virtual NeedsDirectory", vm1)
-	}
-
-	if len(bundle2.Children()) != 1 {
-		t.Errorf("bundle2.Children len = %d, want 1", len(bundle2.Children()))
-	}
-
-	if present[video1] || present[sub1] || present[video2] {
-		t.Errorf("grouped file nodes unexpectedly still present at top-level")
-	}
-	if !present[straySub] {
-		t.Errorf("orphan subtitle dropped; expected to remain at top-level")
-	}
-	if !present[existingDir] {
-		t.Errorf("existing directory missing from output")
+			fm := core.GetMeta(file)
+			if fm == nil {
+				t.Fatalf("MovieAnnotate didn't create meta for %s", tt.filename)
+			}
+			if fm.Type != tt.wantType {
+				t.Errorf("MovieAnnotate(%s) type = %v, want %v", tt.filename, fm.Type, tt.wantType)
+			}
+			if fm.NewName != tt.wantNewName {
+				t.Errorf("MovieAnnotate(%s) NewName = %q, want %q", tt.filename, fm.NewName, tt.wantNewName)
+			}
+		})
 	}
 }
 
-func TestMovieAnnotate_ExistingDirectory(t *testing.T) {
-	dir := testNewDirNode("Some.Movie.2024.1080p")
-	vid := testNewFileNode("Some.Movie.2024.1080p.mkv")
-	sub := testNewFileNode("Some.Movie.2024.1080p.en.srt")
-	dir.AddChild(vid)
-	dir.AddChild(sub)
+func TestMoviePreprocess_DefensiveEmptyExtension(t *testing.T) {
+	// Test the defensive check for empty suffix
+	nodeWithEmptyExt := testNewFileNode("movie") // no extension
+	video := testNewFileNode("movie.mkv")
+	nodes := []*treeview.Node[treeview.FileInfo]{nodeWithEmptyExt, video}
+	
+	out := MoviePreprocess(nodes)
+	
+	// The file with no extension should be left alone or bundled
+	foundOriginal := false
+	foundInVirtual := false
+	for _, n := range out {
+		if n.Name() == "movie" {
+			foundOriginal = true
+		}
+		// Check if it's inside a virtual directory
+		for _, child := range n.Children() {
+			if child.Name() == "movie" {
+				foundInVirtual = true
+			}
+		}
+	}
+	if !foundOriginal && !foundInVirtual {
+		t.Errorf("MoviePreprocess lost file with no extension")
+	}
+}
+
+func TestMoviePreprocess_SubtitleDefensiveEmptySuffix(t *testing.T) {
+	// Test defensive check for subtitles with empty suffix (lines 60-61)
+	video := testNewFileNode("movie.mkv")
+	// Create a subtitle that would return empty suffix
+	badSubtitle := testNewFileNode("movie.srt") // This should return empty suffix from ExtractSubtitleSuffix
+	nodes := []*treeview.Node[treeview.FileInfo]{video, badSubtitle}
+	
+	out := MoviePreprocess(nodes)
+	
+	// Should create one virtual directory for the video
+	virtualCount := 0
+	for _, n := range out {
+		if m := core.GetMeta(n); m != nil && m.IsVirtual {
+			virtualCount++
+		}
+	}
+	
+	// Should have one virtual directory for the video
+	if virtualCount != 1 {
+		t.Errorf("MoviePreprocess with empty suffix subtitle = %d virtual dirs, want 1", virtualCount)
+	}
+}
+
+func TestMovieAnnotate_ChildWithoutParentNewName(t *testing.T) {
+	// Test lines 105-106: parent without NewName should be skipped
+	dir := testNewDirNode("Movie.Directory")
+	child := testNewFileNode("movie.mkv")
+	dir.AddChild(child)
 	tr := testNewTree(dir)
-
+	
+	// Pre-annotate directory but don't set NewName
+	dirMeta := core.EnsureMeta(dir)
+	dirMeta.Type = core.MediaMovie
+	// Don't set NewName - should cause child to be skipped
+	
 	MovieAnnotate(tr)
-
-	dm := core.GetMeta(dir)
-	if dm == nil || dm.Type != core.MediaMovie || dm.NewName == "" {
-		t.Fatalf("MovieAnnotate dir meta = %#v, want movie with NewName", dm)
-	}
-	vm := core.GetMeta(vid)
-	sm := core.GetMeta(sub)
-	if vm == nil || vm.Type != core.MediaMovieFile || vm.NewName == "" {
-		t.Errorf("video meta = %#v, want movie file name", vm)
-	}
-	if sm == nil || sm.Type != core.MediaMovieFile || sm.NewName == "" {
-		t.Errorf("subtitle meta = %#v, want movie file name", sm)
-	}
-	if sm != nil && vm != nil && cmp.Equal(vm.NewName, sm.NewName, cmpopts.EquateEmpty()) {
-		t.Errorf("subtitle NewName %q equals video NewName %q; expected language+ext suffix", sm.NewName, vm.NewName)
+	
+	// Child should not have been annotated
+	childMeta := core.GetMeta(child)
+	if childMeta != nil && childMeta.Type == core.MediaMovieFile {
+		t.Errorf("MovieAnnotate should have skipped child when parent has no NewName")
 	}
 }

@@ -17,6 +17,10 @@ _default: test
 	go test -cover -coverprofile=coverage.out ./...
 	go tool cover -func=coverage.out
 
+@cover-check:
+	go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+	go-test-coverage --config=./.testcoverage.yml
+
 # Generate HTML coverage report (also prints function summary)
 @test-cover-html: test-cover
 	go tool cover -html=coverage.out -o coverage.html
@@ -24,7 +28,7 @@ _default: test
 
 # Clean coverage artifacts
 @clean-coverage:
-	rm -f coverage.out coverage.html || true
+	rm -f coverage.out cover.out coverage.html || true
 
 # Helper to validate mode and return canonical name
 _validate_mode mode:

@@ -184,3 +184,113 @@ func TestCreateVirtualDir_SuccessChildrenMixed(t *testing.T) {
 		t.Errorf("createVirtualDir(mixed) dir path = %s, want Movie Name", vdir.Data().Path)
 	}
 }
+
+func TestRenameCompleteMsg(t *testing.T) {
+	msg := RenameCompleteMsg{successCount: 5, errorCount: 2}
+	
+	if got := msg.SuccessCount(); got != 5 {
+		t.Errorf("RenameCompleteMsg.SuccessCount() = %d, want 5", got)
+	}
+	
+	if got := msg.ErrorCount(); got != 2 {
+		t.Errorf("RenameCompleteMsg.ErrorCount() = %d, want 2", got)
+	}
+}
+
+func TestPerformRenames_DeletionPhase(t *testing.T) {
+	// Test the deletion phase (lines 158-179)
+	tmp := t.TempDir()
+	cwd, _ := os.Getwd()
+	defer os.Chdir(cwd)
+	os.Chdir(tmp)
+
+	// Create files to delete
+	os.WriteFile("delete1.nfo", []byte("nfo1"), 0644)
+	os.WriteFile("delete2.jpg", []byte("img1"), 0644)
+	os.WriteFile("keep.mkv", []byte("video"), 0644)
+
+	// Create nodes
+	deleteFile1 := fsTestNode("delete1.nfo", false, "delete1.nfo")
+	deleteFile1Meta := core.EnsureMeta(deleteFile1)
+	deleteFile1Meta.MarkedForDeletion = true
+
+	deleteFile2 := fsTestNode("delete2.jpg", false, "delete2.jpg")
+	deleteFile2Meta := core.EnsureMeta(deleteFile2)
+	deleteFile2Meta.MarkedForDeletion = true
+
+	keepFile := fsTestNode("keep.mkv", false, "keep.mkv")
+	keepFileMeta := core.EnsureMeta(keepFile)
+	keepFileMeta.NewName = "keep.mkv" // No rename needed
+
+	tree := treeview.NewTree([]*treeview.Node[treeview.FileInfo]{
+		deleteFile1, deleteFile2, keepFile,
+	}, treeview.WithProvider(CreateRenameProvider()))
+
+	model := NewRenameModel(tree)
+	model.prepareRenameProgress()
+
+	// Process all operations
+	var rc RenameCompleteMsg
+	for {
+		msg := model.PerformRenames()()
+		if completeMsg, ok := msg.(RenameCompleteMsg); ok {
+			rc = completeMsg
+			break
+		}
+	}
+
+	// Should have deleted 2 files
+	if rc.successCount != 2 || rc.errorCount != 0 {
+		t.Errorf("PerformRenames deletion phase: success=%d, errors=%d, want success=2, errors=0", rc.successCount, rc.errorCount)
+	}
+
+	// Files should be deleted
+	if _, err := os.Stat("delete1.nfo"); err == nil {
+		t.Errorf("delete1.nfo should have been deleted")
+	}
+	if _, err := os.Stat("delete2.jpg"); err == nil {
+		t.Errorf("delete2.jpg should have been deleted")
+	}
+	if _, err := os.Stat("keep.mkv"); err != nil {
+		t.Errorf("keep.mkv should still exist: %v", err)
+	}
+}
+
+func TestPerformRenames_DeletionError(t *testing.T) {
+	// Test deletion error handling (lines 170-172)
+	tmp := t.TempDir()
+	cwd, _ := os.Getwd()
+	defer os.Chdir(cwd)
+	os.Chdir(tmp)
+
+	// Create node for non-existent file
+	deleteFile := fsTestNode("nonexistent.nfo", false, "nonexistent.nfo")
+	deleteFileMeta := core.EnsureMeta(deleteFile)
+	deleteFileMeta.MarkedForDeletion = true
+
+	tree := treeview.NewTree([]*treeview.Node[treeview.FileInfo]{deleteFile}, 
+		treeview.WithProvider(CreateRenameProvider()))
+
+	model := NewRenameModel(tree)
+	model.prepareRenameProgress()
+
+	// Process deletion
+	var rc RenameCompleteMsg
+	for {
+		msg := model.PerformRenames()()
+		if completeMsg, ok := msg.(RenameCompleteMsg); ok {
+			rc = completeMsg
+			break
+		}
+	}
+
+	// Should have error
+	if rc.errorCount != 1 || rc.successCount != 0 {
+		t.Errorf("PerformRenames deletion error: success=%d, errors=%d, want success=0, errors=1", rc.successCount, rc.errorCount)
+	}
+
+	// Check error status
+	if deleteFileMeta.RenameStatus != core.RenameStatusError {
+		t.Errorf("Deletion failure should set RenameStatusError, got %v", deleteFileMeta.RenameStatus)
+	}
+}
