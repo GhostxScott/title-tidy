@@ -37,7 +37,7 @@ the entire directory structure: show folders, season folders, and all episode fi
 command can process multiple shows at once. Episode files named only after the episode
 will retrieve the season number from the parent directory name. 
 
-![shows demo](https://vhs.charm.sh/vhs-6VKRWRBFCbSiTEJaQue1sK.gif)
+![shows demo](https://vhs.charm.sh/vhs-khp71wEjoZxTZlWgZqKZO.gif)
 
 **Before → After examples:**
 ```
@@ -79,7 +79,7 @@ title-tidy seasons
 Perfect when adding a new season to an existing show directory. Episode files named only after the episode
 will retrieve the season number from the directory name. 
 
-![seasons demo](https://vhs.charm.sh/vhs-4FuaWa9SUlKOlKjYwNuJsu.gif)
+![seasons demo](https://vhs.charm.sh/vhs-1bRJ33A4Cjv08ADpQljJkr.gif)
 
 **Before → After examples:**
 ```
@@ -101,7 +101,7 @@ title-tidy episodes
 Sometimes you have a collection of episode files in a folder. No season directory, no show folder, just files.
 This command renames each episode file based on the season and episode information found in the filename.
 
-![episodes demo](https://vhs.charm.sh/vhs-44YlsPbZzh2nD5Y0xKcD3y.gif)
+![episodes demo](https://vhs.charm.sh/vhs-1KolM7bO4Zho1BfR44p65R.gif)
 
 **Before → After examples:**
 ```
@@ -122,7 +122,7 @@ Movies receive special handling. Standalone movie files automatically get their 
 folders have both the folder and file names cleaned up. Subtitles remain properly paired with their movies, maintaining
 language codes.
 
-![movies demo](https://vhs.charm.sh/vhs-onVh4pgl0mp7eLzuIEfwW.gif)
+![movies demo](https://vhs.charm.sh/vhs-3xo1AUhao1iUtafmkNHRdz.gif)
 
 **Before → After examples:**
 ```

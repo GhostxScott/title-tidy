@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/Digital-Shane/title-tidy/internal/core"
@@ -147,6 +148,14 @@ func (m *RenameModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		// Handle custom keys before passing to tree model
 		switch msg.String() {
+		case "delete", "d":
+			if focusedNode := m.TuiTreeModel.Tree.GetFocusedNode(); focusedNode != nil {
+				// Move focus up one position before deletion to maintain nearby focus
+				m.TuiTreeModel.Tree.Move(context.Background(), -1)
+				m.removeNodeFromTree(focusedNode)
+				m.statsDirty = true
+			}
+			return m, nil
 		case "r":
 			if !m.renameInProgress {
 				m.renameInProgress = true
@@ -258,7 +267,7 @@ func (m *RenameModel) renderStatusBar() string {
 		combined := fmt.Sprintf("%s  %s", bar, statusText)
 		return statusStyleBase.Width(m.width).Render(combined)
 	}
-	statusText := "↑↓: Navigate  PgUp/PgDn: Page  ←→: Expand/Collapse  │  r: Rename  │  esc: Quit"
+	statusText := "↑↓: Navigate  PgUp/PgDn: Page  ←→: Expand/Collapse  │  r: Rename  │  d: Remove  │  esc: Quit"
 	return statusStyleBase.Width(m.width).Render(statusText)
 }
 
@@ -416,4 +425,41 @@ func (m *RenameModel) calculateStats() Statistics {
 	m.statsCache = stats
 	m.statsDirty = false
 	return stats
+}
+
+// removeNodeFromTree removes the given node from the tree by checking if it's a root node
+// (has no parent) and either removing it from the root slice or from its parent's children.
+func (m *RenameModel) removeNodeFromTree(nodeToRemove *treeview.Node[treeview.FileInfo]) {
+	if nodeToRemove == nil {
+		return
+	}
+	
+	parent := nodeToRemove.Parent()
+	if parent == nil {
+		m.removeRootNode(nodeToRemove)
+		return
+	}
+
+	// Remove the node from its parent's children
+	currentChildren := parent.Children()
+	// Create a new slice to avoid modifying the original
+	childrenCopy := make([]*treeview.Node[treeview.FileInfo], len(currentChildren))
+	copy(childrenCopy, currentChildren)
+	filteredChildren := slices.DeleteFunc(childrenCopy, func(n *treeview.Node[treeview.FileInfo]) bool {
+		return n == nodeToRemove
+	})
+	parent.SetChildren(filteredChildren)
+}
+
+// removeRootNode removes a root node from the tree's internal nodes slice
+func (m *RenameModel) removeRootNode(nodeToRemove *treeview.Node[treeview.FileInfo]) {
+	// Get the current root nodes and filter out the node to remove
+	currentRoots := m.TuiTreeModel.Tree.Nodes()
+	// Create a new slice to avoid modifying the original
+	rootsCopy := make([]*treeview.Node[treeview.FileInfo], len(currentRoots))
+	copy(rootsCopy, currentRoots)
+	filteredRoots := slices.DeleteFunc(rootsCopy, func(n *treeview.Node[treeview.FileInfo]) bool {
+		return n == nodeToRemove
+	})
+	m.TuiTreeModel.Tree.SetNodes(filteredRoots)
 }

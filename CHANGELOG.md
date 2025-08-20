@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.3.0] - 2025-08-20
+### Added
+- Delete key support to remove tree nodes and cancel rename operations.
+  - Use `delete` or `d` key to remove focused nodes from the tree.
+  - Removes the node and all child operations from rename processing.
+  - Focus automatically moves up one position after deletion for smooth navigation.
+### Updated
+- All demo gifs.
+
 ## [v1.2.0] - 2025-08-19
 ### Added
 - Progress bar during file indexing.
