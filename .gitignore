@@ -1,6 +1,7 @@
 title-tidy
 .idea
 .vscode
+cover.out
 coverage.out
 coverage.html
 **/.DS_Store
