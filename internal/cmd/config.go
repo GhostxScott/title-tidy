@@ -112,11 +112,22 @@ func CreateMediaFilter(includeDirectories bool) func(info treeview.FileInfo) boo
 	}
 }
 
-// UnwrapRoot returns children of single root directory, otherwise original nodes
+// UnwrapRoot returns children of single root directory, otherwise original nodes.
+// When unwrapping, it clones just the immediate children to clear their parent references.
 func UnwrapRoot(t *treeview.Tree[treeview.FileInfo]) []*treeview.Node[treeview.FileInfo] {
 	ns := t.Nodes()
 	if len(ns) == 1 && ns[0].Data().IsDir() {
-		return ns[0].Children()
+		children := ns[0].Children()
+		// Clone just the immediate children to clear their parent references
+		cloned := make([]*treeview.Node[treeview.FileInfo], len(children))
+		for i, child := range children {
+			// Clone the node to clear its parent reference
+			clone := treeview.NewNodeClone(child)
+			// Keep the original children
+			clone.SetChildren(child.Children())
+			cloned[i] = clone
+		}
+		return cloned
 	}
 	return ns
 }

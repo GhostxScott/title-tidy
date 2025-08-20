@@ -1,12 +1,14 @@
 package tui
 
 import (
-	"github.com/Digital-Shane/title-tidy/internal/core"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/Digital-Shane/title-tidy/internal/core"
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/Digital-Shane/treeview"
 	tea "github.com/charmbracelet/bubbletea"
@@ -354,5 +356,101 @@ func TestPerformRenames_BottomUpOrder(t *testing.T) {
 	}
 	if parent.Data().Path != "parentDirRenamed" {
 		t.Errorf("performRenames(bottomUp) parent path = %s, want parentDirRenamed", parent.Data().Path)
+	}
+}
+
+// Helper to create a test node for removal tests
+func testRemovalNode(t *testing.T, name string, isDir bool) *treeview.Node[treeview.FileInfo] {
+	t.Helper()
+	fi := core.NewSimpleFileInfo(name, isDir)
+	return treeview.NewNode(name, name, treeview.FileInfo{FileInfo: fi, Path: name})
+}
+
+// Helper to create a simple tree for testing
+func createTestTree(t *testing.T, nodes ...*treeview.Node[treeview.FileInfo]) *treeview.Tree[treeview.FileInfo] {
+	t.Helper()
+	return treeview.NewTree(nodes,
+		treeview.WithExpandAll[treeview.FileInfo](),
+		treeview.WithProvider(CreateRenameProvider()),
+	)
+}
+
+// Helper to get node names from a slice
+func nodeNames(t *testing.T, nodes []*treeview.Node[treeview.FileInfo]) []string {
+	t.Helper()
+	names := make([]string, len(nodes))
+	for i, n := range nodes {
+		names[i] = n.Name()
+	}
+	return names
+}
+
+func TestRemoveNodeFromTree(t *testing.T) {
+	tests := []struct {
+		name         string
+		setupTree    func() (*RenameModel, *treeview.Node[treeview.FileInfo])
+		verifyResult func(t *testing.T, model *RenameModel)
+	}{
+		{
+			name: "remove_nil_node",
+			setupTree: func() (*RenameModel, *treeview.Node[treeview.FileInfo]) {
+				root := testRemovalNode(t, "root", true)
+				tree := createTestTree(t, root)
+				model := NewRenameModel(tree)
+				return model, nil
+			},
+			verifyResult: func(t *testing.T, model *RenameModel) {
+				// Should not panic, tree should be unchanged
+				if len(model.TuiTreeModel.Tree.Nodes()) != 1 {
+					t.Errorf("removeNodeFromTree(nil) changed tree, nodes = %d, want 1", len(model.TuiTreeModel.Tree.Nodes()))
+				}
+			},
+		},
+		{
+			name: "remove_root_node_no_parent",
+			setupTree: func() (*RenameModel, *treeview.Node[treeview.FileInfo]) {
+				root1 := testRemovalNode(t, "root1", true)
+				root2 := testRemovalNode(t, "root2", true)
+				tree := createTestTree(t, root1, root2)
+				model := NewRenameModel(tree)
+				return model, root1
+			},
+			verifyResult: func(t *testing.T, model *RenameModel) {
+				got := nodeNames(t, model.TuiTreeModel.Tree.Nodes())
+				want := []string{"root2"}
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("removeNodeFromTree(root) remaining nodes mismatch (-want +got):\n%s", diff)
+				}
+			},
+		},
+		{
+			name: "remove_child_node",
+			setupTree: func() (*RenameModel, *treeview.Node[treeview.FileInfo]) {
+				root := testRemovalNode(t, "root", true)
+				child1 := testRemovalNode(t, "child1", false)
+				child2 := testRemovalNode(t, "child2", false)
+				child3 := testRemovalNode(t, "child3", false)
+				root.SetChildren([]*treeview.Node[treeview.FileInfo]{child1, child2, child3})
+				tree := createTestTree(t, root)
+				model := NewRenameModel(tree)
+				return model, child2
+			},
+			verifyResult: func(t *testing.T, model *RenameModel) {
+				root := model.TuiTreeModel.Tree.Nodes()[0]
+				got := nodeNames(t, root.Children())
+				want := []string{"child1", "child3"}
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("removeNodeFromTree(child2) parent's children mismatch (-want +got):\n%s", diff)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model, nodeToRemove := tt.setupTree()
+			model.removeNodeFromTree(nodeToRemove)
+			tt.verifyResult(t, model)
+		})
 	}
 }

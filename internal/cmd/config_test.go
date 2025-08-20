@@ -38,7 +38,7 @@ func TestCreateMediaFilter(t *testing.T) {
 }
 
 func TestUnwrapRoot(t *testing.T) {
-	// single root directory => unwrap children
+	// single root directory => unwrap children (cloned to clear parent refs)
 	rootDir := testNewDirNode("Root")
 	childA := testNewFileNode("a.mkv")
 	childB := testNewFileNode("b.srt")
@@ -46,8 +46,22 @@ func TestUnwrapRoot(t *testing.T) {
 	rootDir.AddChild(childB)
 	tr1 := testNewTree(rootDir)
 	got := UnwrapRoot(tr1)
-	if len(got) != 2 || got[0] != childA || got[1] != childB {
-		t.Errorf("UnwrapRoot(single) = %v, want children [%v %v]", got, childA, childB)
+	if len(got) != 2 {
+		t.Errorf("UnwrapRoot(single) returned %d nodes, want 2", len(got))
+	}
+	// Check that we got clones with same data but no parent
+	if got[0].Name() != childA.Name() || got[0].Data().Name() != childA.Data().Name() {
+		t.Errorf("UnwrapRoot(single) first node = %v, want clone of %v", got[0].Name(), childA.Name())
+	}
+	if got[1].Name() != childB.Name() || got[1].Data().Name() != childB.Data().Name() {
+		t.Errorf("UnwrapRoot(single) second node = %v, want clone of %v", got[1].Name(), childB.Name())
+	}
+	// Verify parent references are cleared
+	if got[0].Parent() != nil {
+		t.Errorf("UnwrapRoot(single) first node still has parent reference")
+	}
+	if got[1].Parent() != nil {
+		t.Errorf("UnwrapRoot(single) second node still has parent reference")
 	}
 
 	// multiple top nodes => unchanged
