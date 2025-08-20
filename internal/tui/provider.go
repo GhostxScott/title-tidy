@@ -60,14 +60,18 @@ func markedForDeletion() func(*treeview.Node[treeview.FileInfo]) bool {
 	return metaRule(func(mm *core.MediaMeta) bool { return mm.MarkedForDeletion && mm.RenameStatus == core.RenameStatusNone })
 }
 
-// deletionSuccess matches successfully deleted nodes  
+// deletionSuccess matches successfully deleted nodes
 func deletionSuccess() func(*treeview.Node[treeview.FileInfo]) bool {
-	return metaRule(func(mm *core.MediaMeta) bool { return mm.MarkedForDeletion && mm.RenameStatus == core.RenameStatusSuccess })
+	return metaRule(func(mm *core.MediaMeta) bool {
+		return mm.MarkedForDeletion && mm.RenameStatus == core.RenameStatusSuccess
+	})
 }
 
 // deletionError matches nodes that failed to delete
 func deletionError() func(*treeview.Node[treeview.FileInfo]) bool {
-	return metaRule(func(mm *core.MediaMeta) bool { return mm.MarkedForDeletion && mm.RenameStatus == core.RenameStatusError })
+	return metaRule(func(mm *core.MediaMeta) bool {
+		return mm.MarkedForDeletion && mm.RenameStatus == core.RenameStatusError
+	})
 }
 
 // CreateRenameProvider constructs the [treeview.DefaultNodeProvider] used by
@@ -176,7 +180,7 @@ func RenameFormatter(node *treeview.Node[treeview.FileInfo]) (string, bool) {
 	if mm == nil {
 		return node.Name(), true
 	}
-	
+
 	// File marked for deletion - show just the filename (icon handles the status)
 	if mm.MarkedForDeletion {
 		if mm.RenameStatus == core.RenameStatusError {
@@ -184,7 +188,7 @@ func RenameFormatter(node *treeview.Node[treeview.FileInfo]) (string, bool) {
 		}
 		return node.Name(), true
 	}
-	
+
 	if mm.NewName == "" {
 		// no proposed rename
 		return node.Name(), true

@@ -245,10 +245,17 @@ func TestPerformRenames_Integration(t *testing.T) {
 	vdir.AddChild(v2)
 	tree := treeview.NewTree([]*treeview.Node[treeview.FileInfo]{childA, childB, vdir}, treeview.WithProvider(CreateRenameProvider()))
 	model := &RenameModel{TuiTreeModel: treeview.NewTuiTreeModel(tree)}
-	msg := model.PerformRenames()()
-	rc, ok := msg.(RenameCompleteMsg)
-	if !ok {
-		t.Fatalf("performRenames(integration) msg type = %T, want renameCompleteMsg", msg)
+	model.prepareRenameProgress()
+
+	// Process all operations until completion for test
+	var rc RenameCompleteMsg
+	for {
+		msg := model.PerformRenames()()
+		if completeMsg, ok := msg.(RenameCompleteMsg); ok {
+			rc = completeMsg
+			break
+		}
+		// Continue processing if we got a progress message
 	}
 	if rc.successCount != 3 || rc.errorCount != 1 {
 		t.Errorf("performRenames(integration) counts = (success=%d,error=%d), want (3,1)", rc.successCount, rc.errorCount)
@@ -276,6 +283,7 @@ func TestPerformRenames_Integration(t *testing.T) {
 func TestPerformRenames_NoOps(t *testing.T) {
 	tree := treeview.NewTree([]*treeview.Node[treeview.FileInfo]{}, treeview.WithProvider(CreateRenameProvider()))
 	m := &RenameModel{TuiTreeModel: treeview.NewTuiTreeModel(tree)}
+	m.prepareRenameProgress()
 	rc := m.PerformRenames()().(RenameCompleteMsg)
 	if rc.successCount != 0 || rc.errorCount != 0 {
 		t.Errorf("performRenames(noNodes) counts = %+v, want 0/0", rc)
@@ -283,6 +291,7 @@ func TestPerformRenames_NoOps(t *testing.T) {
 	n := fsTestNode("file.txt", false, "file.txt")
 	tree2 := treeview.NewTree([]*treeview.Node[treeview.FileInfo]{n}, treeview.WithProvider(CreateRenameProvider()))
 	m2 := &RenameModel{TuiTreeModel: treeview.NewTuiTreeModel(tree2)}
+	m2.prepareRenameProgress()
 	rc2 := m2.PerformRenames()().(RenameCompleteMsg)
 	if rc2.successCount != 0 || rc2.errorCount != 0 {
 		t.Errorf("performRenames(oneNoMeta) counts = %+v, want 0/0", rc2)
@@ -300,6 +309,7 @@ func BenchmarkPerformRenames_NoWork(b *testing.B) {
 	m := &RenameModel{TuiTreeModel: treeview.NewTuiTreeModel(tree)}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		m.prepareRenameProgress()
 		_ = m.PerformRenames()().(RenameCompleteMsg)
 	}
 }
@@ -324,7 +334,18 @@ func TestPerformRenames_BottomUpOrder(t *testing.T) {
 	parent.AddChild(child)
 	tree := treeview.NewTree([]*treeview.Node[treeview.FileInfo]{parent}, treeview.WithProvider(CreateRenameProvider()))
 	m := &RenameModel{TuiTreeModel: treeview.NewTuiTreeModel(tree)}
-	rc := m.PerformRenames()().(RenameCompleteMsg)
+	m.prepareRenameProgress()
+
+	// Process all operations until completion for test
+	var rc RenameCompleteMsg
+	for {
+		msg := m.PerformRenames()()
+		if completeMsg, ok := msg.(RenameCompleteMsg); ok {
+			rc = completeMsg
+			break
+		}
+		// Continue processing if we got a progress message
+	}
 	if rc.successCount != 2 || rc.errorCount != 0 {
 		t.Errorf("performRenames(bottomUp) counts = %+v, want success=2 error=0", rc)
 	}

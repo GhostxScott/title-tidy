@@ -1,12 +1,14 @@
 package tui
 
 import (
+	"context"
 	"fmt"
-	"github.com/Digital-Shane/title-tidy/internal/core"
 	"os"
 	"path/filepath"
 
+	"github.com/Digital-Shane/title-tidy/internal/core"
 	"github.com/Digital-Shane/treeview"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // RenameCompleteMsg is emitted once performRenames finishes walking the tree.
@@ -17,6 +19,48 @@ func (r RenameCompleteMsg) SuccessCount() int { return r.successCount }
 
 // ErrorCount returns the number of errors during renames
 func (r RenameCompleteMsg) ErrorCount() int { return r.errorCount }
+
+// internal progress message for streaming rename updates
+type renameProgressMsg struct{}
+
+// prepareRenameProgress counts total operations (renames, deletions, virtual dir creations)
+func (m *RenameModel) prepareRenameProgress() {
+	// Count operations without storing them to save memory
+	m.virtualDirCount = 0
+	m.deletionCount = 0
+	m.renameCount = 0
+
+	// Single pass to count all operation types
+	for info, _ := range m.Tree.All(context.Background()) {
+		n := info.Node
+		mm := core.GetMeta(n)
+		if mm == nil {
+			continue
+		}
+		if mm.MarkedForDeletion {
+			m.deletionCount++
+			continue
+		}
+		if mm.NeedsDirectory && mm.IsVirtual {
+			m.virtualDirCount++
+			continue
+		}
+		// Skip children of virtual dirs as they're handled with their parent
+		if parent := n.Parent(); parent != nil {
+			if pm := core.GetMeta(parent); pm != nil && pm.IsVirtual {
+				continue
+			}
+		}
+		if mm.NewName != "" && mm.NewName != n.Name() {
+			m.renameCount++
+		}
+	}
+
+	// Total operations: virtual dirs + deletions + regular renames
+	m.totalRenameOps = m.virtualDirCount + m.deletionCount + m.renameCount
+	m.completedOps = 0
+	m.currentOpIndex = 0
+}
 
 // RenameRegular renames a node; returns true only when an actual filesystem rename occurred.
 func RenameRegular(node *treeview.Node[treeview.FileInfo], mm *core.MediaMeta) (bool, error) {
@@ -48,6 +92,7 @@ func CreateVirtualDir(node *treeview.Node[treeview.FileInfo], mm *core.MediaMeta
 		errs = append(errs, fmt.Errorf("create %s: %w", mm.NewName, mm.Fail(err)))
 		return successes, errs
 	}
+
 	// Directory created successfully
 	successes++
 	mm.Success()
@@ -70,4 +115,118 @@ func CreateVirtualDir(node *treeview.Node[treeview.FileInfo], mm *core.MediaMeta
 		child.Data().Path = newChildPath
 	}
 	return successes, errs
+}
+
+// PerformRenames walks the tree bottom‑up executing pending rename operations.
+// It skips children of virtual directories (handled by the virtual parent) and
+// aggregates success / error counts into a renameCompleteMsg.
+//
+// This function is designed to be called repeatedly by Bubble Tea, processing one
+// operation at a time and yielding control back to the UI between operations.
+// This allows for progress updates and maintains UI responsiveness during long
+// rename operations.
+func (m *RenameModel) PerformRenames() tea.Cmd {
+	return func() tea.Msg {
+		// Check if all operations have been completed
+		if m.completedOps >= m.totalRenameOps {
+			return RenameCompleteMsg{successCount: m.successCount, errorCount: m.errorCount}
+		}
+		currentCount := 0
+
+		// Phase 1: Virtual directories
+		// These are processed first because child files will be moved into them
+		if m.currentOpIndex < m.virtualDirCount {
+			// Iterate through tree to find the nth virtual directory
+			for info := range m.Tree.All(context.Background()) {
+				node := info.Node
+				mm := core.GetMeta(node)
+				if mm != nil && mm.NeedsDirectory && mm.IsVirtual {
+					// Found a virtual directory
+					// check if it's the one we need to process
+					if currentCount == m.currentOpIndex {
+						// Create the directory and move its children into it
+						s, errs := CreateVirtualDir(node, mm)
+						m.successCount += s
+						m.errorCount += len(errs)
+						m.completedOps++
+						m.currentOpIndex++
+						break // Yield control back to UI
+					}
+					currentCount++
+				}
+			}
+		} else if m.currentOpIndex < m.virtualDirCount+m.deletionCount {
+			// Phase 2: Deletions (NFO files, images, etc. marked for removal)
+			// Calculate which deletion we're looking for in this phase
+			targetIndex := m.currentOpIndex - m.virtualDirCount
+			for info := range m.Tree.All(context.Background()) {
+				node := info.Node
+				mm := core.GetMeta(node)
+				if mm != nil && mm.MarkedForDeletion {
+					// Found a file to delete
+					// check if it's the one we need to process
+					if currentCount == targetIndex {
+						// Attempt to delete the file
+						if err := os.Remove(node.Data().Path); err != nil {
+							mm.Fail(err)
+							m.errorCount++
+						} else {
+							mm.Success()
+							m.successCount++
+						}
+						m.completedOps++
+						m.currentOpIndex++
+						break // Yield control back to UI
+					}
+					currentCount++
+				}
+			}
+		} else {
+			// Phase 3: Regular renames (standard file/folder renames)
+			// Process bottom-up so child renames happen before parent renames
+			targetIndex := m.currentOpIndex - m.virtualDirCount - m.deletionCount
+			for info := range m.Tree.AllBottomUp(context.Background()) {
+				node := info.Node
+				mm := core.GetMeta(node)
+				if mm == nil {
+					continue
+				}
+				// Skip operations already handled in previous phases
+				if mm.MarkedForDeletion || (mm.NeedsDirectory && mm.IsVirtual) {
+					continue
+				}
+				// Skip children of virtual dirs (they're moved by their parent's CreateVirtualDir)
+				if parent := node.Parent(); parent != nil {
+					if pm := core.GetMeta(parent); pm != nil && pm.IsVirtual {
+						continue
+					}
+				}
+				// Only process nodes that actually need renaming
+				if mm.NewName != "" && mm.NewName != node.Name() {
+					// Found a file to rename
+					// check if it's the one we need to process
+					if currentCount == targetIndex {
+						// Perform the filesystem rename operation
+						if renamed, err := RenameRegular(node, mm); err != nil {
+							m.errorCount++
+						} else if renamed {
+							m.successCount++
+						}
+						m.completedOps++
+						m.currentOpIndex++
+						break // Yield control back to UI
+					}
+					currentCount++
+				}
+			}
+		}
+
+		// Check again if all operations are now complete
+		if m.completedOps >= m.totalRenameOps {
+			return RenameCompleteMsg{successCount: m.successCount, errorCount: m.errorCount}
+		}
+
+		// Return progress message to continue processing in next Bubble Tea cycle
+		return renameProgressMsg{}
+	}
 }

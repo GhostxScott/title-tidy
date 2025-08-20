@@ -37,21 +37,33 @@ type CommandConfig struct {
 }
 
 func RunCommand(cfg CommandConfig) error {
-	// Build initial filesystem tree
-	t, err := treeview.NewTreeFromFileSystem(context.Background(), ".", false,
-		treeview.WithMaxDepth[treeview.FileInfo](cfg.maxDepth),
-		treeview.WithFilterFunc(CreateMediaFilter(cfg.includeDirs)),
-	)
+	// 1. Run indexing (filesystem scan + progress UI) once.
+	idxModel := tui.NewIndexProgressModel(".", tui.IndexConfig{
+		MaxDepth:    cfg.maxDepth,
+		IncludeDirs: cfg.includeDirs,
+		Filter:      CreateMediaFilter(cfg.includeDirs),
+	})
+	finalModel, err := tea.NewProgram(idxModel, tea.WithAltScreen()).Run()
 	if err != nil {
 		return err
 	}
+	// Retrieve built tree from progress model.
+	im, ok := finalModel.(*tui.IndexProgressModel)
+	if !ok {
+		return fmt.Errorf("unexpected model type %T after indexing", finalModel)
+	}
+	t := im.Tree()
+	if t == nil {
+		return fmt.Errorf("indexing produced no tree")
+	}
 
-	// Unwrap root (avoid direct indexing & panic)
+	// 2. Prepare nodes
 	nodes := UnwrapRoot(t)
 	if cfg.preprocess != nil {
 		nodes = cfg.preprocess(nodes)
 	}
 
+	// 3. Rebuild application tree with provider and expansion.
 	t = treeview.NewTree(nodes,
 		treeview.WithExpandAll[treeview.FileInfo](),
 		treeview.WithProvider(tui.CreateRenameProvider()),
@@ -74,16 +86,13 @@ func RunCommand(cfg CommandConfig) error {
 		cmd := model.PerformRenames()
 		if cmd != nil {
 			msg := cmd()
-			if result, ok := msg.(tui.RenameCompleteMsg); ok {
-				if result.ErrorCount() > 0 {
-					return fmt.Errorf("%d errors occurred during renaming", result.ErrorCount())
-				}
+			if result, ok := msg.(tui.RenameCompleteMsg); ok && result.ErrorCount() > 0 {
+				return fmt.Errorf("%d errors occurred during renaming", result.ErrorCount())
 			}
 		}
 		return nil
 	}
-
-	// Launch TUI
+	// 4. Launch rename TUI
 	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err = p.Run()
 	return err

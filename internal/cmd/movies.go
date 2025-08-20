@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"context"
-	"github.com/Digital-Shane/treeview"
 	"github.com/Digital-Shane/title-tidy/internal/core"
 	"github.com/Digital-Shane/title-tidy/internal/media"
+	"github.com/Digital-Shane/treeview"
 )
 
 var MoviesCommand = CommandConfig{

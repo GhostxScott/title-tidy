@@ -4,7 +4,7 @@ Set Framerate 10
 Set Shell zsh
 Set FontSize 16
 Set Width 1100
-Set Height 600
+Set Height 700
 
 Hide
 Type "./make.sh"
