@@ -187,11 +187,11 @@ func TestCreateVirtualDir_SuccessChildrenMixed(t *testing.T) {
 
 func TestRenameCompleteMsg(t *testing.T) {
 	msg := RenameCompleteMsg{successCount: 5, errorCount: 2}
-	
+
 	if got := msg.SuccessCount(); got != 5 {
 		t.Errorf("RenameCompleteMsg.SuccessCount() = %d, want 5", got)
 	}
-	
+
 	if got := msg.ErrorCount(); got != 2 {
 		t.Errorf("RenameCompleteMsg.ErrorCount() = %d, want 2", got)
 	}
@@ -268,7 +268,7 @@ func TestPerformRenames_DeletionError(t *testing.T) {
 	deleteFileMeta := core.EnsureMeta(deleteFile)
 	deleteFileMeta.MarkedForDeletion = true
 
-	tree := treeview.NewTree([]*treeview.Node[treeview.FileInfo]{deleteFile}, 
+	tree := treeview.NewTree([]*treeview.Node[treeview.FileInfo]{deleteFile},
 		treeview.WithProvider(CreateRenameProvider()))
 
 	model := NewRenameModel(tree)

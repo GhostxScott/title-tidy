@@ -9,10 +9,10 @@ import (
 
 func TestMovieAnnotate_FileTypes(t *testing.T) {
 	tests := []struct {
-		name         string
-		filename     string
-		wantNewName  string
-		wantType     core.MediaType
+		name        string
+		filename    string
+		wantNewName string
+		wantType    core.MediaType
 	}{
 		{
 			name:        "video file",
@@ -56,9 +56,9 @@ func TestMoviePreprocess_DefensiveEmptyExtension(t *testing.T) {
 	nodeWithEmptyExt := testNewFileNode("movie") // no extension
 	video := testNewFileNode("movie.mkv")
 	nodes := []*treeview.Node[treeview.FileInfo]{nodeWithEmptyExt, video}
-	
+
 	out := MoviePreprocess(nodes)
-	
+
 	// The file with no extension should be left alone or bundled
 	foundOriginal := false
 	foundInVirtual := false
@@ -84,9 +84,9 @@ func TestMoviePreprocess_SubtitleDefensiveEmptySuffix(t *testing.T) {
 	// Create a subtitle that would return empty suffix
 	badSubtitle := testNewFileNode("movie.srt") // This should return empty suffix from ExtractSubtitleSuffix
 	nodes := []*treeview.Node[treeview.FileInfo]{video, badSubtitle}
-	
+
 	out := MoviePreprocess(nodes)
-	
+
 	// Should create one virtual directory for the video
 	virtualCount := 0
 	for _, n := range out {
@@ -94,7 +94,7 @@ func TestMoviePreprocess_SubtitleDefensiveEmptySuffix(t *testing.T) {
 			virtualCount++
 		}
 	}
-	
+
 	// Should have one virtual directory for the video
 	if virtualCount != 1 {
 		t.Errorf("MoviePreprocess with empty suffix subtitle = %d virtual dirs, want 1", virtualCount)
@@ -107,14 +107,14 @@ func TestMovieAnnotate_ChildWithoutParentNewName(t *testing.T) {
 	child := testNewFileNode("movie.mkv")
 	dir.AddChild(child)
 	tr := testNewTree(dir)
-	
+
 	// Pre-annotate directory but don't set NewName
 	dirMeta := core.EnsureMeta(dir)
 	dirMeta.Type = core.MediaMovie
 	// Don't set NewName - should cause child to be skipped
-	
+
 	MovieAnnotate(tr)
-	
+
 	// Child should not have been annotated
 	childMeta := core.GetMeta(child)
 	if childMeta != nil && childMeta.Type == core.MediaMovieFile {

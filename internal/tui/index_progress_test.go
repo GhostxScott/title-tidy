@@ -57,6 +57,10 @@ func TestIndexProgressModel_Update(t *testing.T) {
 			name: "progress frame",
 			msg:  progress.FrameMsg{},
 		},
+		{
+			name: "unhandled message",
+			msg:  "unknown message",
+		},
 	}
 
 	for _, tt := range tests {
@@ -64,16 +68,16 @@ func TestIndexProgressModel_Update(t *testing.T) {
 			// Reset model for each test
 			m := NewIndexProgressModel(tempDir, cfg)
 			_ = m
-			
+
 			updatedModel, cmd := m.Update(tt.msg)
-			
+
 			if tt.wantQuit {
 				// Check if quit command was returned
 				if cmd == nil {
 					t.Errorf("Update(%T) returned nil cmd, want quit cmd", tt.msg)
 				}
 			}
-			
+
 			if tt.wantWidth > 0 {
 				if m, ok := updatedModel.(*IndexProgressModel); ok {
 					if m.width != tt.wantWidth {
@@ -96,7 +100,7 @@ func TestIndexProgressModel_View(t *testing.T) {
 		model.filesIndexed = 25
 
 		view := model.View()
-		
+
 		expectedContents := []string{
 			"Indexing Media Library",
 			"Roots processed: 5/10",
@@ -120,7 +124,7 @@ func TestIndexProgressModel_View(t *testing.T) {
 		model.err = testErr
 
 		view := model.View()
-		
+
 		if !strings.Contains(view, "Error:") {
 			t.Errorf("View() with error missing 'Error:' prefix")
 		}
@@ -175,7 +179,7 @@ func TestIndexProgressModel_waitForMsg(t *testing.T) {
 func TestIndexConfig_DefaultFilter(t *testing.T) {
 	// Test the default filter fallback (lines 91-102)
 	tempDir := t.TempDir()
-	
+
 	// Create test files
 	os.WriteFile(filepath.Join(tempDir, "normal.mkv"), []byte("video"), 0644)
 	os.WriteFile(filepath.Join(tempDir, ".DS_Store"), []byte("macos"), 0644)
@@ -190,13 +194,13 @@ func TestIndexConfig_DefaultFilter(t *testing.T) {
 	}
 
 	model := NewIndexProgressModel(tempDir, cfg)
-	
+
 	// Simulate Init to start the build process
 	cmd := model.Init()
 	if cmd == nil {
 		t.Fatalf("Init() = nil, want non-nil cmd")
 	}
-	
+
 	// Give some time for the async build to start
 	// The buildTreeAsync function should execute the default filter
 	time.Sleep(100 * time.Millisecond)
@@ -225,13 +229,13 @@ func TestIndexConfig_IncludeDirsFilter(t *testing.T) {
 			}
 
 			model := NewIndexProgressModel(tempDir, cfg)
-			
+
 			// Start build to trigger filter execution
 			cmd := model.Init()
 			if cmd == nil {
 				t.Fatalf("Init() = nil, want non-nil cmd")
 			}
-			
+
 			// Allow async build to execute
 			time.Sleep(100 * time.Millisecond)
 		})
@@ -241,7 +245,7 @@ func TestIndexConfig_IncludeDirsFilter(t *testing.T) {
 func TestBuildTreeAsyncError(t *testing.T) {
 	// Test error handling in buildTreeAsync (line 151)
 	nonExistentDir := "/path/that/does/not/exist"
-	
+
 	cfg := IndexConfig{
 		MaxDepth:    1,
 		IncludeDirs: false,
@@ -249,16 +253,16 @@ func TestBuildTreeAsyncError(t *testing.T) {
 	}
 
 	model := NewIndexProgressModel(nonExistentDir, cfg)
-	
+
 	// Start the build process which should fail
 	cmd := model.Init()
 	if cmd == nil {
 		t.Fatalf("Init() = nil, want non-nil cmd")
 	}
-	
+
 	// Wait for the async operation to complete
 	time.Sleep(200 * time.Millisecond)
-	
+
 	// Check that error was captured
 	if model.Err() == nil {
 		t.Errorf("Expected error for non-existent directory, got nil")
@@ -268,7 +272,7 @@ func TestBuildTreeAsyncError(t *testing.T) {
 func TestIndexProgressChannelBlocking(t *testing.T) {
 	// Test channel communication with potential blocking (lines 116-119)
 	tempDir := t.TempDir()
-	
+
 	// Create many files to potentially trigger the default case in select
 	for i := 0; i < 100; i++ {
 		os.WriteFile(filepath.Join(tempDir, fmt.Sprintf("file%d.txt", i)), []byte("data"), 0644)
@@ -281,7 +285,7 @@ func TestIndexProgressChannelBlocking(t *testing.T) {
 	}
 
 	model := NewIndexProgressModel(tempDir, cfg)
-	
+
 	// Fill up the message channel to potentially trigger the default case
 	go func() {
 		for i := 0; i < cap(model.msgCh)+10; i++ {
@@ -292,13 +296,13 @@ func TestIndexProgressChannelBlocking(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// Start indexing while channel is potentially full
 	cmd := model.Init()
 	if cmd == nil {
 		t.Fatalf("Init() = nil, want non-nil cmd")
 	}
-	
+
 	// Allow processing
 	time.Sleep(200 * time.Millisecond)
 }

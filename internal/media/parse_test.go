@@ -1,6 +1,7 @@
 package media
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/Digital-Shane/title-tidy/internal/core"
@@ -182,5 +183,19 @@ func TestParseSeasonEpisode_FallbackFailure_NilNode(t *testing.T) {
 	t.Parallel()
 	if s, e, ok := ParseSeasonEpisode("Episode 4.mkv", nil); ok {
 		t.Errorf("ParseSeasonEpisode(nilNode) = (%d,%d,%v), want failure", s, e, ok)
+	}
+}
+
+func TestFirstIntFromRegexps_EmptySubmatch(t *testing.T) {
+	t.Parallel()
+	
+	// Test with regex that has empty capturing groups to hit line 150-151
+	// This regex matches but has empty first capture group
+	re := regexp.MustCompile(`(\d*)test(\d+)`)
+	
+	// Input where first group matches empty string but second matches number  
+	got, ok := firstIntFromRegexps("test123", re)
+	if !ok || got != 123 {
+		t.Errorf("firstIntFromRegexps with empty submatch = (%d,%v), want (123,true)", got, ok)
 	}
 }

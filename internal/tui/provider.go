@@ -2,6 +2,8 @@ package tui
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/Digital-Shane/title-tidy/internal/core"
 	"github.com/Digital-Shane/title-tidy/internal/media"
 
@@ -21,6 +23,37 @@ var (
 	// State colors (2 colors)
 	colorSuccess = lipgloss.Color("#5dc796") // Success operations
 	colorError   = lipgloss.Color("#f04c56") // Error states
+)
+
+// Tree icon sets for different terminal capabilities
+var (
+	// Emoji icons for tree items (modern terminals)
+	treeEmojiIcons = map[string]string{
+		"success":   "✅",
+		"error":     "❌",
+		"delete":    "❌",
+		"virtual":   "➕",
+		"show":      "📺",
+		"season":    "📁",
+		"episode":   "🎬",
+		"movie":     "🎬",
+		"moviefile": "🎥",
+		"default":   "📄",
+	}
+
+	// ASCII icons for tree items (SSH-safe)
+	treeAsciiIcons = map[string]string{
+		"success":   "[v]",
+		"error":     "[!]",
+		"delete":    "[x]",
+		"virtual":   "[+]",
+		"show":      "[TV]",
+		"season":    "[S]",
+		"episode":   "[E]",
+		"movie":     "[M]",
+		"moviefile": "[F]",
+		"default":   "[ ]",
+	}
 )
 
 // ---- predicate helpers ----
@@ -74,32 +107,52 @@ func deletionError() func(*treeview.Node[treeview.FileInfo]) bool {
 	})
 }
 
+// selectTreeIconSet chooses the best icon set for tree items based on terminal capabilities
+func selectTreeIconSet() map[string]string {
+	// In SSH, be more conservative
+	if isSshSession() {
+		return treeAsciiIcons
+	}
+
+	return treeEmojiIcons
+}
+
+func isSshSession() bool {
+	return os.Getenv("SSH_CLIENT") != "" ||
+			os.Getenv("SSH_TTY") != "" ||
+			os.Getenv("SSH_CONNECTION") != "" ||
+			os.Getenv("SSH_CLIENT") != ""
+}
+
 // CreateRenameProvider constructs the [treeview.DefaultNodeProvider] used by
 // the TUI and instant execution paths. It wires together:
 //   - icon rules (status precedes type so success/error override type icons)
 //   - style rules (normal & focused variants) with precedence similar to icons
 //   - the custom [renameFormatter] for inline original→new labeling.
 func CreateRenameProvider() *treeview.DefaultNodeProvider[treeview.FileInfo] {
+	// Detect terminal capabilities and select appropriate icon set
+	iconSet := selectTreeIconSet()
+
 	// Icon rules (order matters: status first)
 	// Deletion status icons (highest priority)
-	deletionSuccessIconRule := treeview.WithIconRule(deletionSuccess(), "✅")
-	deletionErrorIconRule := treeview.WithIconRule(deletionError(), "❌")
-	markedForDeletionIconRule := treeview.WithIconRule(markedForDeletion(), "❌")
+	deletionSuccessIconRule := treeview.WithIconRule(deletionSuccess(), iconSet["success"])
+	deletionErrorIconRule := treeview.WithIconRule(deletionError(), iconSet["delete"])
+	markedForDeletionIconRule := treeview.WithIconRule(markedForDeletion(), iconSet["delete"])
 	// Regular status icons
-	successIconRule := treeview.WithIconRule(statusIs(core.RenameStatusSuccess), "✅")
-	errorIconRule := treeview.WithIconRule(statusIs(core.RenameStatusError), "❌")
-	virtualDirIconRule := treeview.WithIconRule(needsDir(), "➕")
-	showIconRule := treeview.WithIconRule(statusNoneType(core.MediaShow), "📺")
-	seasonIconRule := treeview.WithIconRule(statusNoneType(core.MediaSeason), "📁")
-	episodeIconRule := treeview.WithIconRule(statusNoneType(core.MediaEpisode), "🎬")
-	movieIconRule := treeview.WithIconRule(statusNoneType(core.MediaMovie), "🎬")
+	successIconRule := treeview.WithIconRule(statusIs(core.RenameStatusSuccess), iconSet["success"])
+	errorIconRule := treeview.WithIconRule(statusIs(core.RenameStatusError), iconSet["error"])
+	virtualDirIconRule := treeview.WithIconRule(needsDir(), iconSet["virtual"])
+	showIconRule := treeview.WithIconRule(statusNoneType(core.MediaShow), iconSet["show"])
+	seasonIconRule := treeview.WithIconRule(statusNoneType(core.MediaSeason), iconSet["season"])
+	episodeIconRule := treeview.WithIconRule(statusNoneType(core.MediaEpisode), iconSet["episode"])
+	movieIconRule := treeview.WithIconRule(statusNoneType(core.MediaMovie), iconSet["movie"])
 	movieFileIconRule := treeview.WithIconRule(func(n *treeview.Node[treeview.FileInfo]) bool {
 		if media.IsSubtitle(n.Name()) {
 			return false
 		}
 		return statusNoneType(core.MediaMovieFile)(n)
-	}, "🎥")
-	defaultIconRule := treeview.WithDefaultIcon[treeview.FileInfo]("📄")
+	}, iconSet["moviefile"])
+	defaultIconRule := treeview.WithDefaultIcon[treeview.FileInfo](iconSet["default"])
 
 	// Style rules (most specific first)
 	showStyleRule := treeview.WithStyleRule(

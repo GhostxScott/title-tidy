@@ -14,6 +14,44 @@ import (
 	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
+)
+
+// Icon sets for different terminal capabilities
+var (
+	// High-quality emoji icons (for modern terminals)
+	emojiIcons = map[string]string{
+		"stats":      "📊",
+		"tv":         "📺",
+		"movie":      "🎬",
+		"seasons":    "📁",
+		"episodes":   "🎬",
+		"video":      "🎥",
+		"subtitles":  "📄",
+		"needrename": "✓",
+		"nochange":   "=",
+		"delete":     "🗑",
+		"success":    "✅",
+		"error":      "❌",
+		"arrows":     "↑↓←→",
+	}
+
+	// ASCII fallback (always works)
+	asciiIcons = map[string]string{
+		"stats":      "[*]",
+		"tv":         "[TV]",
+		"movie":      "[M]",
+		"seasons":    "[D]",
+		"episodes":   "[E]",
+		"video":      "[V]",
+		"subtitles":  "[S]",
+		"needrename": "[+]",
+		"nochange":   "[=]",
+		"delete":     "[x]",
+		"success":    "[v]",
+		"error":      "[!]",
+		"arrows":     "^v<>",
+	}
 )
 
 // Cached base styles (applied with dynamic Width each render) to avoid
@@ -62,6 +100,9 @@ type RenameModel struct {
 	// Stat tracking
 	statsCache Statistics
 	statsDirty bool
+
+	// Icon support
+	iconSet     map[string]string
 }
 
 // NewRenameModel returns an initialized RenameModel for the provided tree with
@@ -72,6 +113,12 @@ func NewRenameModel(tree *treeview.Tree[treeview.FileInfo]) *RenameModel {
 		height:     24,
 		statsDirty: true,
 	}
+
+	// Detect terminal capabilities and configure icons
+	m.detectTerminalCapabilities()
+	runewidth.DefaultCondition.EastAsianWidth = false
+	runewidth.DefaultCondition.StrictEmojiNeutral = true
+
 	m.progressModel = progress.New(progress.WithGradient(string(colorPrimary), string(colorAccent)))
 	m.progressModel.Width = 40
 	// establish initial layout metrics before building underlying model
@@ -80,11 +127,30 @@ func NewRenameModel(tree *treeview.Tree[treeview.FileInfo]) *RenameModel {
 	return m
 }
 
+// detectTerminalCapabilities determines what icons to use based on terminal and environment
+func (m *RenameModel) detectTerminalCapabilities() {
+	// Check if we're in SSH
+	if isSshSession() {
+		m.iconSet = asciiIcons
+	} else {
+		m.iconSet = emojiIcons
+	}
+}
+
+// getIcon returns the appropriate icon for the current terminal
+func (m *RenameModel) getIcon(iconType string) string {
+	if icon, exists := m.iconSet[iconType]; exists {
+		return icon
+	}
+	// Fallback to ASCII if icon not found
+	return asciiIcons[iconType]
+}
+
 // CalculateLayout recomputes panel dimensions from current window size.
 func (m *RenameModel) CalculateLayout() {
 	// Set tree width to 60%
 	tw := m.width * 6 / 10
-	// Add virtual space for header, status, and white space
+	// Reserve space for header (1) + status bar (1) + spacing (1) = 3 lines
 	th := m.height - 3
 	// Ensure min height
 	if th < 5 {
@@ -92,11 +158,10 @@ func (m *RenameModel) CalculateLayout() {
 	}
 	m.treeWidth = tw
 	m.treeHeight = th
-	// Stats panel uses remaining width; rounding differences fall to stats.
+	// Stats panel uses remaining width
 	m.statsWidth = m.width - tw
-	// Height subtracts 2 additional lines to compensate for the rounded border.
-	// (Previously m.height-5 == (m.height-3)-2.)
-	m.statsHeight = th - 2
+	// Stats panel has same height as tree (both panels should align)
+	m.statsHeight = th
 	// ensure a minimal positive stats height
 	if m.statsHeight < 1 {
 		m.statsHeight = 1
@@ -245,9 +310,9 @@ func (m *RenameModel) renderHeader() string {
 	path, _ := os.Getwd()
 	var title string
 	if m.IsMovieMode {
-		title = fmt.Sprintf("🎬 Movie Rename - %s", path)
+		title = fmt.Sprintf("%s Movie Rename - %s", m.getIcon("movie"), path)
 	} else {
-		title = fmt.Sprintf("📺 TV Show Rename - %s", path)
+		title = fmt.Sprintf("%s TV Show Rename - %s", m.getIcon("tv"), path)
 	}
 	return style.Render(title)
 }
@@ -267,7 +332,9 @@ func (m *RenameModel) renderStatusBar() string {
 		combined := fmt.Sprintf("%s  %s", bar, statusText)
 		return statusStyleBase.Width(m.width).Render(combined)
 	}
-	statusText := "↑↓: Navigate  PgUp/PgDn: Page  ←→: Expand/Collapse  │  r: Rename  │  d: Remove  │  esc: Quit"
+	statusText := fmt.Sprintf("%s: Navigate  PgUp/PgDn: Page  %s: Expand/Collapse  │  r: Rename  │  d: Remove  │  esc: Quit", 
+		m.getIcon("arrows")[:2], // First two characters (up/down arrows)
+		m.getIcon("arrows")[2:]) // Last two characters (left/right arrows)
 	return statusStyleBase.Width(m.width).Render(statusText)
 }
 
@@ -279,51 +346,74 @@ func (m *RenameModel) renderTwoPanelLayout() string {
 	// Force tree view to use exact allocated width to prevent stats panel from jumping
 	treeContainer := lipgloss.NewStyle().
 		Width(m.treeWidth).
+		MaxWidth(m.treeWidth).
 		Render(treeView)
 
+	// Stats panel already handles its own width internally, don't double-wrap
 	return lipgloss.JoinHorizontal(lipgloss.Top, treeContainer, statsPanel)
 }
 
 // renderStatsPanel builds and formats the statistics panel content.
 func (m *RenameModel) renderStatsPanel() string {
-	style := lipgloss.NewStyle().
-		Width(m.statsWidth - 6).
-		Height(m.statsHeight).
+	// Create base style with border and padding
+	borderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(colorAccent).
 		Padding(1)
+
+	// Calculate the actual content width needed after accounting for frame
+	// The frame includes border (2) + padding (2) = 4 horizontal chars
+	frameWidth := borderStyle.GetHorizontalFrameSize()
+	frameHeight := borderStyle.GetVerticalFrameSize()
+
+	contentWidth := m.statsWidth - frameWidth
+	contentHeight := m.statsHeight - frameHeight
+
+	if contentWidth < 1 {
+		contentWidth = 1
+	}
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+
+	// Apply calculated dimensions to the style
+	// Width/Height in lipgloss is for the content area only when padding is used
+	style := borderStyle.
+		Width(contentWidth).
+		Height(contentHeight)
 
 	stats := m.calculateStats()
 	var b strings.Builder
 	b.Grow(512)
 
-	b.WriteString("📊 Statistics\n\n")
+	// Format stats content with appropriate icons based on terminal capabilities
+	fmt.Fprintf(&b, "%s Statistics\n\n", m.getIcon("stats"))
 	b.WriteString("Files Found:\n")
 	if m.IsMovieMode {
-		fmt.Fprintf(&b, "  🎬 Movies:      %d\n", stats.movieCount)
-		fmt.Fprintf(&b, "  🎥 Video Files: %d\n", stats.movieFileCount-stats.subtitleCount)
-		fmt.Fprintf(&b, "  📄 Subtitles:   %d\n", stats.subtitleCount)
+		fmt.Fprintf(&b, "  %s %-12s %d\n", m.getIcon("movie"), "Movies:", stats.movieCount)
+		fmt.Fprintf(&b, "  %s %-12s %d\n", m.getIcon("video"), "Video Files:", stats.movieFileCount-stats.subtitleCount)
+		fmt.Fprintf(&b, "  %s %-12s %d\n", m.getIcon("subtitles"), "Subtitles:", stats.subtitleCount)
 	} else {
-		fmt.Fprintf(&b, "  📺 TV Shows:    %d\n", stats.showCount)
-		fmt.Fprintf(&b, "  📁 Seasons:     %d\n", stats.seasonCount)
-		fmt.Fprintf(&b, "  🎬 Episodes:    %d\n", stats.episodeCount)
-		fmt.Fprintf(&b, "  📄 Subtitles:   %d\n", stats.subtitleCount)
+		fmt.Fprintf(&b, "  %s %-12s %d\n", m.getIcon("tv"), "TV Shows:", stats.showCount)
+		fmt.Fprintf(&b, "  %s %-12s %d\n", m.getIcon("seasons"), "Seasons:", stats.seasonCount)
+		fmt.Fprintf(&b, "  %s %-12s %d\n", m.getIcon("episodes"), "Episodes:", stats.episodeCount)
+		fmt.Fprintf(&b, "  %s %-12s %d\n", m.getIcon("subtitles"), "Subtitles:", stats.subtitleCount)
 	}
 
 	b.WriteString("\nRename Status:\n")
-	fmt.Fprintf(&b, "  ✓ Need rename:  %d\n", stats.needRenameCount)
-	fmt.Fprintf(&b, "  = No change:    %d\n", stats.noChangeCount)
+	fmt.Fprintf(&b, "  %s %-13s %d\n", m.getIcon("needrename"), "Need rename:", stats.needRenameCount)
+	fmt.Fprintf(&b, "  %s %-13s %d\n", m.getIcon("nochange"), "No change:", stats.noChangeCount)
 	if stats.toDeleteCount > 0 {
-		fmt.Fprintf(&b, "  🗑 To delete:    %d\n", stats.toDeleteCount)
+		fmt.Fprintf(&b, "  %s %-13s %d\n", m.getIcon("delete"), "To delete:", stats.toDeleteCount)
 	}
 
 	if stats.successCount > 0 || stats.errorCount > 0 {
 		b.WriteString("\nLast Operation:\n")
 		if stats.successCount > 0 {
-			fmt.Fprintf(&b, "  ✅ Success:     %d\n", stats.successCount)
+			fmt.Fprintf(&b, "  %s %-12s %d\n", m.getIcon("success"), "Success:", stats.successCount)
 		}
 		if stats.errorCount > 0 {
-			fmt.Fprintf(&b, "  ❌ Errors:      %d\n", stats.errorCount)
+			fmt.Fprintf(&b, "  %s %-12s %d\n", m.getIcon("error"), "Errors:", stats.errorCount)
 		}
 	}
 
@@ -433,7 +523,7 @@ func (m *RenameModel) removeNodeFromTree(nodeToRemove *treeview.Node[treeview.Fi
 	if nodeToRemove == nil {
 		return
 	}
-	
+
 	parent := nodeToRemove.Parent()
 	if parent == nil {
 		m.removeRootNode(nodeToRemove)

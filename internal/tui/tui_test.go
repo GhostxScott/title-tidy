@@ -79,8 +79,8 @@ func buildMovieTestTree() *treeview.Tree[treeview.FileInfo] {
 func TestNewRenameModelInitialization(t *testing.T) {
 	t.Parallel()
 	m := NewRenameModel(buildTVTestTree())
-	if m.width != 80 || m.height != 24 || m.treeWidth != 48 || m.treeHeight != 21 || m.statsWidth != 32 || m.statsHeight != 19 {
-		t.Errorf("NewRenameModel defaults = (w=%d h=%d tw=%d th=%d sw=%d sh=%d), want (80 24 48 21 32 19)", m.width, m.height, m.treeWidth, m.treeHeight, m.statsWidth, m.statsHeight)
+	if m.width != 80 || m.height != 24 || m.treeWidth != 48 || m.treeHeight != 21 || m.statsWidth != 32 || m.statsHeight != 21 {
+		t.Errorf("NewRenameModel defaults = (w=%d h=%d tw=%d th=%d sw=%d sh=%d), want (80 24 48 21 32 21)", m.width, m.height, m.treeWidth, m.treeHeight, m.statsWidth, m.statsHeight)
 	}
 }
 
@@ -167,7 +167,7 @@ func TestViewComponents(t *testing.T) {
 	if !strings.Contains(view, "📺 TV Show Rename") {
 		t.Errorf("View(tv) missing TV header")
 	}
-	if !strings.Contains(view, "↑↓: Navigate") {
+	if !strings.Contains(view, ": Navigate") {
 		t.Errorf("View(tv) missing navigation hints")
 	}
 	if !strings.Contains(view, "📊 Statistics") {
@@ -458,13 +458,13 @@ func TestRemoveNodeFromTree(t *testing.T) {
 func TestKeyHandling(t *testing.T) {
 	t.Parallel()
 	m := NewRenameModel(buildTVTestTree())
-	
+
 	// Test 'd' key (delete)
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
 	if cmd != nil {
 		t.Errorf("Update('d') cmd = %v, want nil", cmd)
 	}
-	
+
 	// Should still return the model
 	if rm, ok := updated.(*RenameModel); !ok {
 		t.Errorf("Update('d') returned %T, want *RenameModel", updated)
@@ -478,13 +478,13 @@ func TestDeleteFilesMode(t *testing.T) {
 	n := tuiTestNode("delete.nfo", false)
 	nm := core.EnsureMeta(n)
 	nm.MarkedForDeletion = true
-	
-	tree := treeview.NewTree([]*treeview.Node[treeview.FileInfo]{n}, 
+
+	tree := treeview.NewTree([]*treeview.Node[treeview.FileInfo]{n},
 		treeview.WithProvider(CreateRenameProvider()))
 	m := NewRenameModel(tree)
 	m.DeleteNFO = true
 	m.DeleteImages = true
-	
+
 	// Should not affect other counts since files marked for deletion
 	// are handled differently in statistics
 	stats := m.calculateStats()
@@ -498,13 +498,13 @@ func TestPageKeysMinimalHeight(t *testing.T) {
 	// Test page keys with minimal tree height to trigger max() logic
 	m := NewRenameModel(buildTVTestTree())
 	m.treeHeight = 5 // Less than 10, should use 10 as pageSize
-	
+
 	// Test that page keys work with small tree height
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("pgup")})
 	if cmd != nil {
 		t.Errorf("Update(pgup small height) cmd = %v, want nil", cmd)
 	}
-	
+
 	_, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("pgdown")})
 	if cmd != nil {
 		t.Errorf("Update(pgdown small height) cmd = %v, want nil", cmd)
@@ -515,7 +515,7 @@ func TestMouseWheelScrolling(t *testing.T) {
 	t.Parallel()
 	// Test mouse wheel handling (lines 178-188)
 	m := NewRenameModel(buildTVTestTree())
-	
+
 	// Test Mouse Wheel Up
 	updated, cmd := m.Update(tea.MouseMsg{Type: tea.MouseWheelUp})
 	if cmd != nil {
@@ -524,7 +524,7 @@ func TestMouseWheelScrolling(t *testing.T) {
 	if _, ok := updated.(*RenameModel); !ok {
 		t.Errorf("Update(mouse wheel up) returned %T, want *RenameModel", updated)
 	}
-	
+
 	// Test Mouse Wheel Down
 	updated, cmd = m.Update(tea.MouseMsg{Type: tea.MouseWheelDown})
 	if cmd != nil {
@@ -539,13 +539,13 @@ func TestProgressMessages(t *testing.T) {
 	t.Parallel()
 	// Test progress message handling
 	m := NewRenameModel(buildTVTestTree())
-	
-	// Test rename progress message 
+
+	// Test rename progress message
 	updated, cmd := m.Update(renameProgressMsg{})
 	if cmd == nil {
 		t.Errorf("Update(renameProgressMsg) cmd = nil, want non-nil")
 	}
-	
+
 	rm := updated.(*RenameModel)
 	if rm == nil {
 		t.Errorf("Update(renameProgressMsg) returned nil model")

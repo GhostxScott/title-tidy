@@ -156,10 +156,10 @@ func TestRenameFormatter_MarkedForDeletion(t *testing.T) {
 	n := testNode("delete.nfo", false)
 	mm := core.EnsureMeta(n)
 	mm.MarkedForDeletion = true
-	
+
 	got, _ := RenameFormatter(n)
-	expected := "delete.nfo"  // Formatter just shows filename, icon handles deletion status
-	
+	expected := "delete.nfo" // Formatter just shows filename, icon handles deletion status
+
 	if got != expected {
 		t.Errorf("RenameFormatter(deleted) = %q, want %q", got, expected)
 	}
@@ -172,10 +172,10 @@ func TestRenameFormatter_MarkedForDeletionWithError(t *testing.T) {
 	mm.MarkedForDeletion = true
 	mm.RenameStatus = core.RenameStatusError
 	mm.RenameError = "Permission denied"
-	
+
 	got, _ := RenameFormatter(n)
 	expected := "failed.nfo: Permission denied"
-	
+
 	if got != expected {
 		t.Errorf("RenameFormatter(deletion error) = %q, want %q", got, expected)
 	}
